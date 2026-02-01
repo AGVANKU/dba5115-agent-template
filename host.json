@@ -1,0 +1,48 @@
+{
+  "version": "2.0",
+  "logging": {
+    "applicationInsights": {
+      "samplingSettings": {
+        "isEnabled": false
+      }
+    },
+    "logLevel": {
+      "default": "Warning",
+      "Function": "Warning",
+      "Function.orchestrate_agent_workflow.User": "Information",
+      "Function.gmail_queue_consumer.User": "Information",
+      "Function.agent_workflow_queue_consumer.User": "Information",
+      "Function.run_agent_workflow.User": "Information",
+      "Function.queue_message.User": "Warning",
+      "Function.gmail_timer_pull.User": "Information",
+      "Function.gmail_pull_handler.User": "Information",
+      "Host.Startup": "Error",
+      "Host.Triggers.Timer": "Error",
+      "Host.Function.Console": "Information",
+      "DurableTask.AzureStorage": "Error",
+      "DurableTask.Core": "Error",
+      "Host.Triggers.DurableTask": "Error",
+      "Azure.Core": "Error",
+      "Azure.Messaging.ServiceBus": "Error",
+      "Microsoft.Azure.WebJobs.Hosting.OptionsLoggingService": "Error",
+      "Microsoft.Azure.WebJobs.Script.WebHost.WebScriptHostHttpRoutesManager": "Error",
+      "Microsoft.Azure.WebJobs.ServiceBus": "Error",
+      "Host.General": "Warning",
+      "Host.Aggregator": "Error"
+    }
+  },
+  "extensions": {
+    "durableTask": {
+      "tracing": {
+        "traceInputsAndOutputs": false,
+        "traceReplayEvents": false
+      }
+    }
+  },
+  "extensionBundle": {
+    "id": "Microsoft.Azure.Functions.ExtensionBundle",
+    "version": "[4.*, 5.0.0)"
+  },
+  "watchDirectories": ["agents", "queues", "hooks", "shared"],
+  "watchFiles": ["function_app.py"]
+}

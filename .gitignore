@@ -1,0 +1,56 @@
+# Byte-compiled / optimized
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+# Azure Functions artifacts
+bin
+obj
+appsettings.json
+local.settings.json
+__blobstorage__
+__queuestorage__
+__azurite_db*__.json
+.python_packages
+function-app.zip
+
+# Sensitive credentials - NEVER commit these!
+credentials.json
+token.json
+rg.json
+*.pem
+*.key
+client_secret*.json
+
+# Secrets and Keys
+KEYS.md
+
+# Logs
+*.log
+logs/
+
+# Test
+*test*
+!agents/templates/
+
+# Claude
+.claude/

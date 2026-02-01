@@ -1,0 +1,57 @@
+{
+  "name": "send_email_notification",
+  "description": "Render structured sections into HTML and send the email. Pass sections (not pre-rendered HTML). The tool handles rendering and sending in one step.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "recipient": {
+        "type": "string",
+        "description": "The email address of the recipient"
+      },
+      "cc": {
+        "type": "string",
+        "description": "Optional CC email address"
+      },
+      "recipient_type": {
+        "type": "string",
+        "description": "'student' or 'admin'"
+      },
+      "agent_type": {
+        "type": "string",
+        "description": "The type of agent that processed the request"
+      },
+      "subject": {
+        "type": "string",
+        "description": "The email subject line"
+      },
+      "sections": {
+        "type": "array",
+        "description": "Array of section objects with type and data (e.g. executive_summary, status_box, resource_list, next_steps, alert, code_block)",
+        "items": {
+          "type": "object"
+        }
+      },
+      "student_email": {
+        "type": "string",
+        "description": "Optional student email for attachment filename"
+      },
+      "attachment_content": {
+        "type": "string",
+        "description": "Optional content to include as a text file attachment"
+      },
+      "course_code": {
+        "type": "string",
+        "description": "Course code for the email header"
+      },
+      "message_id": {
+        "type": "string",
+        "description": "Optional Gmail message ID for metadata"
+      },
+      "student_config_id": {
+        "type": "integer",
+        "description": "Optional student config ID for metadata"
+      }
+    },
+    "required": ["recipient", "recipient_type", "agent_type", "subject", "sections"]
+  }
+}

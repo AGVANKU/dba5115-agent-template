@@ -1,0 +1,26 @@
+{
+  "name": "determine_recipient",
+  "description": "Determine the notification recipient (student vs admin) based on agent type and status. Returns recipient email, recipient_type, cc, and whether to skip.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "agent_type": {
+        "type": "string",
+        "description": "The type of agent that processed the request (e.g. deployment_complete, student_sp_config, troubleshooting)"
+      },
+      "status": {
+        "type": "string",
+        "description": "The processing status (e.g. success, failed, needs_input, complete)"
+      },
+      "student_email": {
+        "type": "string",
+        "description": "The student's email address"
+      },
+      "confidence": {
+        "type": "number",
+        "description": "Confidence score (0-1) for troubleshooting responses"
+      }
+    },
+    "required": ["agent_type"]
+  }
+}

@@ -1,0 +1,31 @@
+.git*
+.vscode
+__azurite_db*__.json
+__blobstorage__
+__queuestorage__
+local.settings.json
+test
+.venv
+# Documentation
+KEYS.md
+DEPLOYMENT.md
+README.md
+
+# Dev Scripts
+test_access.py
+get_keys.py
+show_keys.py
+init_keys.py
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Secrets
+.env
+credentials.json
+token.json
+
+# Artifacts
+function-app.zip

@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.vscode/
+.git/
+.gitignore
+*.log
+.python_packages/
+.DS_Store

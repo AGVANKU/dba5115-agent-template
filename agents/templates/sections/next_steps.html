@@ -1,0 +1,8 @@
+<div style="margin: 20px 0;">
+    <h2 style="margin: 0 0 15px 0; font-size: 20px; font-weight: 600; color: #333;">{{ title|default("Next Steps") }}</h2>
+    <ol style="margin: 0; padding-left: 25px; font-size: 15px; line-height: 1.8; color: #333;">
+        {% for item in items %}
+        <li style="margin: 8px 0;">{{ item }}</li>
+        {% endfor %}
+    </ol>
+</div>

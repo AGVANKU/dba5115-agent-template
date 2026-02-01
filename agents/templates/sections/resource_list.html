@@ -1,0 +1,21 @@
+<div style="margin: 20px 0;">
+    <h2 style="margin: 0 0 15px 0; font-size: 20px; font-weight: 600; color: #333;">{{ title }}</h2>
+    {% for item in items %}
+    <div style="margin: 15px 0; padding: 15px; background-color: #f8f9fa; border-left: 3px solid #6c5ce7; border-radius: 5px;">
+        <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600; color: #333;">{{ item.name }}</h3>
+        {% if item.type %}
+        <p style="margin: 5px 0; font-size: 14px; color: #666;">
+            <strong>Type:</strong> {{ item.type }}
+        </p>
+        {% endif %}
+        {% if item.endpoint %}
+        <p style="margin: 5px 0; font-size: 14px; color: #666;">
+            <strong>Endpoint:</strong> <a href="{{ item.endpoint }}" style="color: #6c5ce7; text-decoration: none;">{{ item.endpoint }}</a>
+        </p>
+        {% endif %}
+        {% if item.description %}
+        <p style="margin: 8px 0 0 0; font-size: 14px; color: #555;">{{ item.description }}</p>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
