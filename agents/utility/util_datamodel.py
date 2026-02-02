@@ -96,13 +96,13 @@ class AgentPromptRegistry(BaseModel):
     """
     __tablename__ = "AgentPromptRegistry"
 
-    __upsert_keys__ = ["agent_type"]
+    __upsert_keys__ = ["agent_id"]
 
     __create_sql__ = """
     IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='AgentPromptRegistry' AND xtype='U')
     CREATE TABLE AgentPromptRegistry (
         Id INT IDENTITY(1,1) PRIMARY KEY,
-        AgentType NVARCHAR(100) NOT NULL UNIQUE,
+        AgentType NVARCHAR(100) NULL,
         AgentId INT NULL,
         BlobPath NVARCHAR(500) NOT NULL,
         Description NVARCHAR(500) NULL,
@@ -120,9 +120,21 @@ class AgentPromptRegistry(BaseModel):
     IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='AgentPromptRegistry' AND COLUMN_NAME='AgentType')
        AND NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='AgentPromptRegistry' AND COLUMN_NAME='AgentId')
     ALTER TABLE AgentPromptRegistry ADD AgentId INT NULL;
+
+    -- Migration: make AgentType nullable if it was NOT NULL
+    IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='AgentPromptRegistry' AND COLUMN_NAME='AgentType' AND IS_NULLABLE='NO')
+    ALTER TABLE AgentPromptRegistry ALTER COLUMN AgentType NVARCHAR(100) NULL;
+
+    -- Migration: drop UNIQUE constraint on AgentType if it exists
+    IF EXISTS (SELECT 1 FROM sys.indexes WHERE name LIKE 'UQ%' AND object_id = OBJECT_ID('AgentPromptRegistry'))
+    BEGIN
+        DECLARE @constraintName1 NVARCHAR(200);
+        SELECT @constraintName1 = name FROM sys.indexes WHERE object_id = OBJECT_ID('AgentPromptRegistry') AND is_unique = 1 AND name LIKE 'UQ%';
+        IF @constraintName1 IS NOT NULL EXEC('ALTER TABLE AgentPromptRegistry DROP CONSTRAINT [' + @constraintName1 + ']');
+    END
     """
 
-    agent_type: Mapped[str] = mapped_column("AgentType", String(100), nullable=False, unique=True)
+    agent_type: Mapped[str | None] = mapped_column("AgentType", String(100), nullable=True)
     agent_id: Mapped[int | None] = mapped_column("AgentId", Integer, nullable=True)
     blob_path: Mapped[str] = mapped_column("BlobPath", String(500), nullable=False)
     description: Mapped[str | None] = mapped_column("Description", String(500), nullable=True)
@@ -140,13 +152,13 @@ class AgentToolMapping(BaseModel):
     """
     __tablename__ = "AgentToolMapping"
 
-    __upsert_keys__ = ["agent_type", "tool_name"]
+    __upsert_keys__ = ["agent_id", "tool_name"]
 
     __create_sql__ = """
     IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='AgentToolMapping' AND xtype='U')
     CREATE TABLE AgentToolMapping (
         Id INT IDENTITY(1,1) PRIMARY KEY,
-        AgentType NVARCHAR(100) NOT NULL,
+        AgentType NVARCHAR(100) NULL,
         AgentId INT NULL,
         ToolName NVARCHAR(100) NOT NULL,
         BlobPath NVARCHAR(500) NOT NULL,
@@ -154,7 +166,7 @@ class AgentToolMapping(BaseModel):
         IsActive BIT NOT NULL DEFAULT 1,
         CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
         UpdatedAt DATETIME,
-        CONSTRAINT UQ_AgentToolMapping UNIQUE (AgentType, ToolName)
+        CONSTRAINT UQ_AgentToolMapping UNIQUE (AgentId, ToolName)
     );
 
     -- Migration: add AgentType if table exists with only AgentId
@@ -166,9 +178,13 @@ class AgentToolMapping(BaseModel):
     IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='AgentToolMapping' AND COLUMN_NAME='AgentType')
        AND NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='AgentToolMapping' AND COLUMN_NAME='AgentId')
     ALTER TABLE AgentToolMapping ADD AgentId INT NULL;
+
+    -- Migration: make AgentType nullable if it was NOT NULL
+    IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='AgentToolMapping' AND COLUMN_NAME='AgentType' AND IS_NULLABLE='NO')
+    ALTER TABLE AgentToolMapping ALTER COLUMN AgentType NVARCHAR(100) NULL;
     """
 
-    agent_type: Mapped[str] = mapped_column("AgentType", String(100), nullable=False)
+    agent_type: Mapped[str | None] = mapped_column("AgentType", String(100), nullable=True)
     agent_id: Mapped[int | None] = mapped_column("AgentId", Integer, nullable=True)
     tool_name: Mapped[str] = mapped_column("ToolName", String(100), nullable=False)
     blob_path: Mapped[str] = mapped_column("BlobPath", String(500), nullable=False)
