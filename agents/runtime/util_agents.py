@@ -27,7 +27,7 @@ from agents.tools.registry import get_tool_definitions, get_tool_executors
 tenant_id = os.getenv("AZURE_TENANT_ID")
 client_id = os.getenv("AZURE_CLIENT_ID")
 client_secret = os.getenv("AZURE_CLIENT_SECRET")
-model="gpt-4o-mini"  # Agent runtime model (separate from deployed models)
+DEFAULT_AGENT_MODEL = os.getenv("DEFAULT_AGENT_MODEL", "gpt-4o-mini")
 agent_endpoint = os.getenv("AZURE_AI_ENDPOINT")
 
 TOOLS_DIR = Path(__file__).resolve().parents[1] / "tools"
@@ -309,6 +309,26 @@ def get_agent_response(
     )
 
 
+def _get_agent_model(agent_type: str) -> str:
+    """Look up the model for an agent from AgentDefinition, falling back to DEFAULT_AGENT_MODEL."""
+    try:
+        from agents.utility.util_database import get_session, ensure_table
+        from agents.utility.util_datamodel import AgentDefinition
+
+        ensure_table(AgentDefinition)
+        with get_session() as session:
+            row = (
+                session.query(AgentDefinition)
+                .filter(AgentDefinition.name == agent_type, AgentDefinition.is_active == True)
+                .first()
+            )
+            if row:
+                return row.model
+    except Exception as e:
+        logging.warning(f"Failed to look up model for agent '{agent_type}', using default: {e}")
+    return DEFAULT_AGENT_MODEL
+
+
 def get_agent(agent_type: str) -> ManagedAgent:
     """
     Get or create an agent.
@@ -325,6 +345,7 @@ def get_agent(agent_type: str) -> ManagedAgent:
 
     # Combine function tools with knowledge tools (AI Search)
     tools = get_tools(agent_type)
+    agent_model = _get_agent_model(agent_type)
     agent = find_agent_by_name(agent_client, agent_type)
 
     if not agent:
@@ -332,21 +353,21 @@ def get_agent(agent_type: str) -> ManagedAgent:
             agent_client.create_agent,
             name=agent_type,
             instructions=instructions,
-            model=model,
+            model=agent_model,
             tools=tools.definitions,
             tool_resources=tools.tool_resources,
             temperature=0)  # Deterministic output
-        logging.info("=== AGENT CREATED === New agent '%s' (id=%s)", agent_type, agent.id)
+        logging.info("=== AGENT CREATED === New agent '%s' (id=%s, model=%s)", agent_type, agent.id, agent_model)
     else:
         agent = _retry_with_backoff(
             agent_client.update_agent,
             agent_id=agent.id,
             instructions=instructions,
-            model=model,
+            model=agent_model,
             tools=tools.definitions,
             tool_resources=tools.tool_resources,
             temperature=0)  # Deterministic output
-        logging.info("=== AGENT UPDATED === Updated agent '%s' (id=%s)", agent_type, agent.id)
+        logging.info("=== AGENT UPDATED === Updated agent '%s' (id=%s, model=%s)", agent_type, agent.id, agent_model)
 
     return ManagedAgent(agent_client=agent_client, agent=agent, tool_executors=tools.executors)
 

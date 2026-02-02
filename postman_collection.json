@@ -1,31 +1,480 @@
 {
   "info": {
-    "name": "Agent Config API",
+    "name": "DBA5115 Agent Platform API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:7071" },
+    { "key": "functionKey", "value": "" },
+    { "key": "agentId", "value": "" },
+    { "key": "promptId", "value": "" },
+    { "key": "toolId", "value": "" }
+  ],
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      { "key": "key", "value": "x-functions-key", "type": "string" },
+      { "key": "value", "value": "{{functionKey}}", "type": "string" },
+      { "key": "in", "value": "header", "type": "string" }
+    ]
   },
   "item": [
     {
-      "name": "Prompts",
+      "name": "Health",
       "item": [
-        { "name": "List Prompts", "request": { "method": "GET", "url": "{{baseUrl}}/api/config/prompts?code={{functionKey}}" } },
-        { "name": "Get Prompt", "request": { "method": "GET", "url": "{{baseUrl}}/api/config/prompts/email_triage?code={{functionKey}}" } },
-        { "name": "Put Prompt", "request": { "method": "PUT", "url": "{{baseUrl}}/api/config/prompts/test_agent?code={{functionKey}}", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"content\": \"You are a test agent.\",\n  \"description\": \"Test prompt\"\n}" } } },
-        { "name": "Delete Prompt", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/config/prompts/test_agent?code={{functionKey}}" } }
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "health"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Hooks",
+      "item": [
+        {
+          "name": "Gmail Pull",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/hooks/gmail_pull",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "hooks", "gmail_pull"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Agent Definitions",
+      "description": "CRUD for AgentDefinition. Create Agent automatically stores the returned id in {{agentId}} for use in subsequent requests.",
+      "item": [
+        {
+          "name": "List All Agents",
+          "request": {
+            "method": "GET",
+            "description": "Returns all agent definitions.",
+            "url": {
+              "raw": "{{baseUrl}}/api/config/agents",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "agents"]
+            }
+          }
+        },
+        {
+          "name": "Get Agent by ID",
+          "request": {
+            "method": "GET",
+            "description": "Returns a single agent definition by id, including its prompt and tool mappings summary. Uses {{agentId}} from a previous Create/Update Agent call.",
+            "url": {
+              "raw": "{{baseUrl}}/api/config/agents/{{agentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "agents", "{{agentId}}"]
+            }
+          }
+        },
+        {
+          "name": "Create Agent",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.id) {",
+                  "    pm.collectionVariables.set('agentId', json.id);",
+                  "    console.log('Saved agentId=' + json.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "description": "Creates a new agent definition. Automatically saves the returned id to {{agentId}} for use in prompt and tool requests.",
+            "url": {
+              "raw": "{{baseUrl}}/api/config/agents",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "agents"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"my_new_agent\",\n  \"description\": \"My custom agent that does X\",\n  \"model\": \"gpt-4o-mini\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Agent",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.id) {",
+                  "    pm.collectionVariables.set('agentId', json.id);",
+                  "    console.log('Saved agentId=' + json.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "description": "Updates an existing agent definition by id. Uses {{agentId}} from a previous Create Agent call.",
+            "url": {
+              "raw": "{{baseUrl}}/api/config/agents/{{agentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "agents", "{{agentId}}"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Updated description\",\n  \"model\": \"gpt-4o\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Agent",
+          "request": {
+            "method": "DELETE",
+            "description": "Deletes an agent definition by id. Returns 409 if prompts or tool mappings still reference it.",
+            "url": {
+              "raw": "{{baseUrl}}/api/config/agents/{{agentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "agents", "{{agentId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Prompts",
+      "description": "CRUD for AgentPromptRegistry. Uses {{agentId}} from a previous Create Agent call. Create Prompt saves the returned id to {{promptId}}.",
+      "item": [
+        {
+          "name": "List All Prompts",
+          "request": {
+            "method": "GET",
+            "description": "Returns all prompt registrations with their agent names.",
+            "url": {
+              "raw": "{{baseUrl}}/api/config/prompts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "prompts"]
+            }
+          }
+        },
+        {
+          "name": "Get Prompt by ID",
+          "request": {
+            "method": "GET",
+            "description": "Returns a prompt by id, including the blob content.",
+            "url": {
+              "raw": "{{baseUrl}}/api/config/prompts/{{promptId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "prompts", "{{promptId}}"]
+            }
+          }
+        },
+        {
+          "name": "Create Prompt (JSON)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.id) {",
+                  "    pm.collectionVariables.set('promptId', json.id);",
+                  "    console.log('Saved promptId=' + json.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "description": "Creates a prompt for an agent. Uses {{agentId}} from Create Agent. Returns 404 if agent doesn't exist, 409 if prompt already exists.",
+            "url": {
+              "raw": "{{baseUrl}}/api/config/prompts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "prompts"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"agent_id\": {{agentId}},\n  \"content\": \"You are a helpful agent...\",\n  \"description\": \"System prompt for my agent\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Create Prompt (File Upload)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.id) {",
+                  "    pm.collectionVariables.set('promptId', json.id);",
+                  "    console.log('Saved promptId=' + json.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "description": "Creates a prompt by uploading a .system.md file. Uses {{agentId}} from Create Agent.",
+            "url": {
+              "raw": "{{baseUrl}}/api/config/prompts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "prompts"]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "agent_id", "value": "{{agentId}}", "type": "text" },
+                { "key": "file", "type": "file", "src": "", "description": "The .system.md prompt file" },
+                { "key": "description", "value": "System prompt for my agent", "type": "text" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Prompt (JSON)",
+          "request": {
+            "method": "PUT",
+            "description": "Updates an existing prompt by id.",
+            "url": {
+              "raw": "{{baseUrl}}/api/config/prompts/{{promptId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "prompts", "{{promptId}}"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Updated prompt content...\",\n  \"description\": \"Updated description\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Prompt (File Upload)",
+          "request": {
+            "method": "PUT",
+            "description": "Updates an existing prompt by id by uploading a new .system.md file.",
+            "url": {
+              "raw": "{{baseUrl}}/api/config/prompts/{{promptId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "prompts", "{{promptId}}"]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": "", "description": "The .system.md prompt file" },
+                { "key": "description", "value": "Updated description", "type": "text" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Prompt",
+          "request": {
+            "method": "DELETE",
+            "description": "Deletes a prompt by id.",
+            "url": {
+              "raw": "{{baseUrl}}/api/config/prompts/{{promptId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "prompts", "{{promptId}}"]
+            }
+          }
+        }
       ]
     },
     {
       "name": "Tool Mappings",
+      "description": "CRUD for AgentToolMapping. Uses {{agentId}} from a previous Create Agent call. Create Tool saves the returned id to {{toolId}}.",
       "item": [
-        { "name": "List Tool Mappings", "request": { "method": "GET", "url": "{{baseUrl}}/api/config/tools?code={{functionKey}}" } },
-        { "name": "Get Agent Tools", "request": { "method": "GET", "url": "{{baseUrl}}/api/config/tools/notification_content?code={{functionKey}}" } },
-        { "name": "Put Tool Mapping", "request": { "method": "PUT", "url": "{{baseUrl}}/api/config/tools/test_agent/test_tool?code={{functionKey}}", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"definition\": {\"name\": \"test_tool\", \"description\": \"A test tool\", \"parameters\": {\"type\": \"object\", \"properties\": {}}},\n  \"executor_name\": \"test_tool\"\n}" } } },
-        { "name": "Delete Tool Mapping", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/config/tools/test_agent/test_tool?code={{functionKey}}" } }
+        {
+          "name": "List All Tool Mappings",
+          "request": {
+            "method": "GET",
+            "description": "Returns all tool mappings with their agent names.",
+            "url": {
+              "raw": "{{baseUrl}}/api/config/tools",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "tools"]
+            }
+          }
+        },
+        {
+          "name": "Get Tool Mapping by ID",
+          "request": {
+            "method": "GET",
+            "description": "Returns a tool mapping by id, including the blob definition.",
+            "url": {
+              "raw": "{{baseUrl}}/api/config/tools/{{toolId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "tools", "{{toolId}}"]
+            }
+          }
+        },
+        {
+          "name": "Create Tool Mapping (JSON)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.id) {",
+                  "    pm.collectionVariables.set('toolId', json.id);",
+                  "    console.log('Saved toolId=' + json.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "description": "Creates a tool mapping for an agent. Uses {{agentId}} from Create Agent. Returns 404 if agent doesn't exist, 409 if mapping already exists.",
+            "url": {
+              "raw": "{{baseUrl}}/api/config/tools",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "tools"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"agent_id\": {{agentId}},\n  \"tool_name\": \"my_tool\",\n  \"definition\": {\n    \"name\": \"my_tool\",\n    \"description\": \"What this tool does\",\n    \"parameters\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"param1\": { \"type\": \"string\", \"description\": \"Describe this parameter\" }\n      },\n      \"required\": [\"param1\"]\n    }\n  },\n  \"executor_name\": \"my_tool\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Create Tool Mapping (File Upload)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.id) {",
+                  "    pm.collectionVariables.set('toolId', json.id);",
+                  "    console.log('Saved toolId=' + json.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "description": "Creates a tool mapping by uploading a .json definition file. Uses {{agentId}} from Create Agent.",
+            "url": {
+              "raw": "{{baseUrl}}/api/config/tools",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "tools"]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "agent_id", "value": "{{agentId}}", "type": "text" },
+                { "key": "tool_name", "value": "my_tool", "type": "text" },
+                { "key": "file", "type": "file", "src": "", "description": "The .json tool definition file" },
+                { "key": "executor_name", "value": "my_tool", "type": "text" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Tool Mapping (JSON)",
+          "request": {
+            "method": "PUT",
+            "description": "Updates a tool mapping by id.",
+            "url": {
+              "raw": "{{baseUrl}}/api/config/tools/{{toolId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "tools", "{{toolId}}"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"definition\": {\n    \"name\": \"my_tool\",\n    \"description\": \"Updated description\",\n    \"parameters\": { \"type\": \"object\", \"properties\": {} }\n  },\n  \"executor_name\": \"my_tool\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Tool Mapping (File Upload)",
+          "request": {
+            "method": "PUT",
+            "description": "Updates a tool mapping by id by uploading a new .json definition file.",
+            "url": {
+              "raw": "{{baseUrl}}/api/config/tools/{{toolId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "tools", "{{toolId}}"]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": "", "description": "The .json tool definition file" },
+                { "key": "executor_name", "value": "my_tool", "type": "text" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Tool Mapping",
+          "request": {
+            "method": "DELETE",
+            "description": "Deletes a tool mapping by id.",
+            "url": {
+              "raw": "{{baseUrl}}/api/config/tools/{{toolId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "tools", "{{toolId}}"]
+            }
+          }
+        }
       ]
     },
     {
       "name": "Seed",
       "item": [
-        { "name": "Seed Defaults", "request": { "method": "POST", "url": "{{baseUrl}}/api/config/seed?code={{functionKey}}" } }
+        {
+          "name": "Seed Defaults",
+          "request": {
+            "method": "POST",
+            "description": "Seeds default agent definitions, prompts, and tool mappings into the database.",
+            "url": {
+              "raw": "{{baseUrl}}/api/config/seed",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "seed"]
+            }
+          }
+        }
       ]
     }
   ]

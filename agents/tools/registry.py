@@ -109,6 +109,17 @@ AGENT_TOOL_MAPPING = {
 # HELPER FUNCTIONS
 # =============================================================================
 
+def _resolve_agent_id(session, agent_name: str) -> int | None:
+    """Resolve agent name to AgentDefinition.id."""
+    from agents.utility.util_datamodel import AgentDefinition
+    row = (
+        session.query(AgentDefinition)
+        .filter(AgentDefinition.name == agent_name, AgentDefinition.is_active == True)
+        .first()
+    )
+    return row.id if row else None
+
+
 def get_tool_executors(agent_name: str) -> dict[str, Callable]:
     """Get filtered tool executors for a specific agent.
 
@@ -116,23 +127,26 @@ def get_tool_executors(agent_name: str) -> dict[str, Callable]:
     """
     try:
         from agents.utility.util_database import get_session, ensure_table
-        from agents.utility.util_datamodel import AgentToolMapping
+        from agents.utility.util_datamodel import AgentDefinition, AgentToolMapping
 
+        ensure_table(AgentDefinition)
         ensure_table(AgentToolMapping)
         with get_session() as session:
-            rows = (
-                session.query(AgentToolMapping)
-                .filter(AgentToolMapping.agent_type == agent_name, AgentToolMapping.is_active == True)
-                .all()
-            )
-            if rows:
-                executors = {}
-                for r in rows:
-                    exec_name = r.executor_name or r.tool_name
-                    if exec_name in ALL_TOOL_EXECUTORS:
-                        executors[r.tool_name] = ALL_TOOL_EXECUTORS[exec_name]
-                logging.info(f"Loaded {len(executors)} tool executors for agent '{agent_name}' from DB")
-                return executors
+            agent_id = _resolve_agent_id(session, agent_name)
+            if agent_id is not None:
+                rows = (
+                    session.query(AgentToolMapping)
+                    .filter(AgentToolMapping.agent_id == agent_id, AgentToolMapping.is_active == True)
+                    .all()
+                )
+                if rows:
+                    executors = {}
+                    for r in rows:
+                        exec_name = r.executor_name or r.tool_name
+                        if exec_name in ALL_TOOL_EXECUTORS:
+                            executors[r.tool_name] = ALL_TOOL_EXECUTORS[exec_name]
+                    logging.info(f"Loaded {len(executors)} tool executors for agent '{agent_name}' from DB")
+                    return executors
     except Exception as e:
         logging.warning(f"DB lookup failed for tool executors '{agent_name}', using fallback: {e}")
 
@@ -160,26 +174,29 @@ def get_tool_definitions(agent_name: str) -> list[dict[str, Any]]:
     """
     try:
         from agents.utility.util_database import get_session, ensure_table
-        from agents.utility.util_datamodel import AgentToolMapping
+        from agents.utility.util_datamodel import AgentDefinition, AgentToolMapping
         from agents.utility.util_blob import get_blob_text
 
+        ensure_table(AgentDefinition)
         ensure_table(AgentToolMapping)
         with get_session() as session:
-            rows = (
-                session.query(AgentToolMapping)
-                .filter(AgentToolMapping.agent_type == agent_name, AgentToolMapping.is_active == True)
-                .all()
-            )
-            if rows:
-                definitions = []
-                for r in rows:
-                    try:
-                        schema = json.loads(get_blob_text(r.blob_path))
-                        tool_def = _load_tool_definition(schema)
-                        definitions.append({"type": "function", "function": tool_def})
-                    except Exception as exc:
-                        logging.warning(f"Failed to load blob tool def {r.blob_path}: {exc}")
-                return definitions
+            agent_id = _resolve_agent_id(session, agent_name)
+            if agent_id is not None:
+                rows = (
+                    session.query(AgentToolMapping)
+                    .filter(AgentToolMapping.agent_id == agent_id, AgentToolMapping.is_active == True)
+                    .all()
+                )
+                if rows:
+                    definitions = []
+                    for r in rows:
+                        try:
+                            schema = json.loads(get_blob_text(r.blob_path))
+                            tool_def = _load_tool_definition(schema)
+                            definitions.append({"type": "function", "function": tool_def})
+                        except Exception as exc:
+                            logging.warning(f"Failed to load blob tool def {r.blob_path}: {exc}")
+                    return definitions
     except Exception as e:
         logging.warning(f"DB/Blob lookup failed for tool definitions '{agent_name}', using fallback: {e}")
 

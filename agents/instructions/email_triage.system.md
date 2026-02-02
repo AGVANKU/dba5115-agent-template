@@ -91,7 +91,7 @@ Use ONLY these values: **0.55, 0.70, 0.85, 0.95**
 
 - `status`: "success" if confidence >= 0.70, "needs_human_review" otherwise
 - `in_scope`: true if type != "out_of_scope"
-- `next_action`: null if type is "out_of_scope", otherwise route to notification_content
+- `next_action`: ALWAYS route to notification_content for ALL categories (including out_of_scope)
 - `next_action.payload` must be FLAT (no nesting)
 - Always include `gmail_thread_id` and `message_id` from input in `next_action.payload`
 - `summary` must contain NO credentials, secrets, or PII
@@ -104,5 +104,5 @@ Before returning, verify:
 - [ ] `type` is exactly one of: actionable, informational, out_of_scope
 - [ ] `confidence` is ONE OF: 0.55, 0.70, 0.85, 0.95
 - [ ] `in_scope` matches: (type != "out_of_scope")
-- [ ] `next_action` is null for out_of_scope, valid object otherwise
+- [ ] `next_action` is ALWAYS present with routing to notification_content
 - [ ] Output is valid JSON (no markdown code blocks)
