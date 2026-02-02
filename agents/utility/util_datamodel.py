@@ -60,6 +60,65 @@ class BaseModel(Base, IdMixin, TimestampMixin):
         return d
 
 
+class AgentPromptRegistry(BaseModel):
+    """Registry mapping agent types to their system prompt blobs."""
+    __tablename__ = "AgentPromptRegistry"
+
+    __upsert_keys__ = ["agent_type"]
+
+    __create_sql__ = """
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='AgentPromptRegistry' AND xtype='U')
+    CREATE TABLE AgentPromptRegistry (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        AgentType NVARCHAR(100) NOT NULL UNIQUE,
+        BlobPath NVARCHAR(500) NOT NULL,
+        Description NVARCHAR(500) NULL,
+        IsActive BIT NOT NULL DEFAULT 1,
+        CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
+        UpdatedAt DATETIME
+    )
+    """
+
+    agent_type: Mapped[str] = mapped_column("AgentType", String(100), nullable=False, unique=True)
+    blob_path: Mapped[str] = mapped_column("BlobPath", String(500), nullable=False)
+    description: Mapped[str | None] = mapped_column("Description", String(500), nullable=True)
+    is_active: Mapped[bool] = mapped_column("IsActive", Integer, nullable=False, default=1)
+
+    def __repr__(self) -> str:
+        return f"<AgentPromptRegistry agent_type={self.agent_type!r}>"
+
+
+class AgentToolMapping(BaseModel):
+    """Maps agent types to their tool definitions in blob storage."""
+    __tablename__ = "AgentToolMapping"
+
+    __upsert_keys__ = ["agent_type", "tool_name"]
+
+    __create_sql__ = """
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='AgentToolMapping' AND xtype='U')
+    CREATE TABLE AgentToolMapping (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        AgentType NVARCHAR(100) NOT NULL,
+        ToolName NVARCHAR(100) NOT NULL,
+        BlobPath NVARCHAR(500) NOT NULL,
+        ExecutorName NVARCHAR(100) NOT NULL,
+        IsActive BIT NOT NULL DEFAULT 1,
+        CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
+        UpdatedAt DATETIME,
+        CONSTRAINT UQ_AgentToolMapping UNIQUE (AgentType, ToolName)
+    )
+    """
+
+    agent_type: Mapped[str] = mapped_column("AgentType", String(100), nullable=False)
+    tool_name: Mapped[str] = mapped_column("ToolName", String(100), nullable=False)
+    blob_path: Mapped[str] = mapped_column("BlobPath", String(500), nullable=False)
+    executor_name: Mapped[str] = mapped_column("ExecutorName", String(100), nullable=False)
+    is_active: Mapped[bool] = mapped_column("IsActive", Integer, nullable=False, default=1)
+
+    def __repr__(self) -> str:
+        return f"<AgentToolMapping agent={self.agent_type!r} tool={self.tool_name!r}>"
+
+
 class LLMTokenUsage(BaseModel):
     """Track LLM token usage for analytics and cost reporting."""
     __tablename__ = "LLMTokenUsage"

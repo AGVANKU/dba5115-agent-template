@@ -1,0 +1,32 @@
+{
+  "info": {
+    "name": "Agent Config API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Prompts",
+      "item": [
+        { "name": "List Prompts", "request": { "method": "GET", "url": "{{baseUrl}}/api/config/prompts?code={{functionKey}}" } },
+        { "name": "Get Prompt", "request": { "method": "GET", "url": "{{baseUrl}}/api/config/prompts/email_triage?code={{functionKey}}" } },
+        { "name": "Put Prompt", "request": { "method": "PUT", "url": "{{baseUrl}}/api/config/prompts/test_agent?code={{functionKey}}", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"content\": \"You are a test agent.\",\n  \"description\": \"Test prompt\"\n}" } } },
+        { "name": "Delete Prompt", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/config/prompts/test_agent?code={{functionKey}}" } }
+      ]
+    },
+    {
+      "name": "Tool Mappings",
+      "item": [
+        { "name": "List Tool Mappings", "request": { "method": "GET", "url": "{{baseUrl}}/api/config/tools?code={{functionKey}}" } },
+        { "name": "Get Agent Tools", "request": { "method": "GET", "url": "{{baseUrl}}/api/config/tools/notification_content?code={{functionKey}}" } },
+        { "name": "Put Tool Mapping", "request": { "method": "PUT", "url": "{{baseUrl}}/api/config/tools/test_agent/test_tool?code={{functionKey}}", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"definition\": {\"name\": \"test_tool\", \"description\": \"A test tool\", \"parameters\": {\"type\": \"object\", \"properties\": {}}},\n  \"executor_name\": \"test_tool\"\n}" } } },
+        { "name": "Delete Tool Mapping", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/config/tools/test_agent/test_tool?code={{functionKey}}" } }
+      ]
+    },
+    {
+      "name": "Seed",
+      "item": [
+        { "name": "Seed Defaults", "request": { "method": "POST", "url": "{{baseUrl}}/api/config/seed?code={{functionKey}}" } }
+      ]
+    }
+  ]
+}
