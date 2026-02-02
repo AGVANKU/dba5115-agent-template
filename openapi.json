@@ -1,0 +1,311 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Agent Config API",
+    "version": "2.0.0",
+    "description": "CRUD API for managing agent definitions, prompts, and tool mappings. POST for creation (data in body), PUT for updates (id in URL). Prompts and tools reference agent_id — the agent must exist first."
+  },
+  "servers": [
+    {
+      "url": "https://{functionApp}.azurewebsites.net",
+      "variables": { "functionApp": { "default": "your-function-app" } }
+    }
+  ],
+  "paths": {
+    "/api/config/agents": {
+      "get": {
+        "operationId": "listAgents",
+        "summary": "List all agent definitions",
+        "responses": {
+          "200": { "description": "Array of agent definitions", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/AgentDefinition" } } } } }
+        }
+      },
+      "post": {
+        "operationId": "createAgent",
+        "summary": "Create a new agent definition",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "description": { "type": "string" },
+                  "model": { "type": "string", "default": "gpt-4o-mini" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Agent created", "content": { "application/json": { "schema": { "type": "object", "properties": { "status": { "type": "string" }, "id": { "type": "integer" }, "name": { "type": "string" }, "model": { "type": "string" } } } } } },
+          "409": { "description": "Agent name already exists" }
+        }
+      }
+    },
+    "/api/config/agents/{id}": {
+      "get": {
+        "operationId": "getAgent",
+        "summary": "Get an agent by id (includes prompt and tools summary)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": {
+          "200": { "description": "Agent with prompt and tools", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AgentDefinitionDetail" } } } },
+          "404": { "description": "Not found" }
+        }
+      },
+      "put": {
+        "operationId": "updateAgent",
+        "summary": "Update an existing agent definition by id",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "description": { "type": "string" },
+                  "model": { "type": "string" },
+                  "is_active": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Updated" },
+          "404": { "description": "Not found" }
+        }
+      },
+      "delete": {
+        "operationId": "deleteAgent",
+        "summary": "Delete an agent definition by id",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": {
+          "200": { "description": "Deleted" },
+          "404": { "description": "Not found" },
+          "409": { "description": "Cannot delete — has dependent prompt or tool rows" }
+        }
+      }
+    },
+    "/api/config/prompts": {
+      "get": {
+        "operationId": "listPrompts",
+        "summary": "List all prompt registrations",
+        "responses": {
+          "200": { "description": "Array of prompts", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/PromptEntry" } } } } }
+        }
+      },
+      "post": {
+        "operationId": "createPrompt",
+        "summary": "Create a prompt for an agent (agent must exist)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["agent_id", "content"],
+                "properties": {
+                  "agent_id": { "type": "integer" },
+                  "content": { "type": "string" },
+                  "description": { "type": "string" }
+                }
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["agent_id", "file"],
+                "properties": {
+                  "agent_id": { "type": "integer" },
+                  "file": { "type": "string", "format": "binary" },
+                  "description": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Prompt created" },
+          "404": { "description": "Agent not found" },
+          "409": { "description": "Prompt already exists for this agent" }
+        }
+      }
+    },
+    "/api/config/prompts/{id}": {
+      "get": {
+        "operationId": "getPrompt",
+        "summary": "Get a prompt by id (includes blob content)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": {
+          "200": { "description": "Prompt with content", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PromptContent" } } } },
+          "404": { "description": "Not found" }
+        }
+      },
+      "put": {
+        "operationId": "updatePrompt",
+        "summary": "Update a prompt by id",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "content": { "type": "string" },
+                  "description": { "type": "string" }
+                }
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": { "type": "string", "format": "binary" },
+                  "description": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Updated" },
+          "404": { "description": "Not found" }
+        }
+      },
+      "delete": {
+        "operationId": "deletePrompt",
+        "summary": "Delete a prompt by id",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": {
+          "200": { "description": "Deleted" },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+    "/api/config/tools": {
+      "get": {
+        "operationId": "listTools",
+        "summary": "List all tool mappings",
+        "responses": {
+          "200": { "description": "Array of tool mappings", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ToolMappingEntry" } } } } }
+        }
+      },
+      "post": {
+        "operationId": "createTool",
+        "summary": "Create a tool mapping for an agent (agent must exist)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["agent_id", "tool_name", "definition"],
+                "properties": {
+                  "agent_id": { "type": "integer" },
+                  "tool_name": { "type": "string" },
+                  "definition": { "type": "object" },
+                  "executor_name": { "type": "string" }
+                }
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["agent_id", "tool_name", "file"],
+                "properties": {
+                  "agent_id": { "type": "integer" },
+                  "tool_name": { "type": "string" },
+                  "file": { "type": "string", "format": "binary" },
+                  "executor_name": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Tool mapping created" },
+          "404": { "description": "Agent not found" },
+          "409": { "description": "Tool mapping already exists for this agent" }
+        }
+      }
+    },
+    "/api/config/tools/{id}": {
+      "get": {
+        "operationId": "getTool",
+        "summary": "Get a tool mapping by id (includes blob definition)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": {
+          "200": { "description": "Tool mapping with definition" },
+          "404": { "description": "Not found" }
+        }
+      },
+      "put": {
+        "operationId": "updateTool",
+        "summary": "Update a tool mapping by id",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "definition": { "type": "object" },
+                  "executor_name": { "type": "string" }
+                }
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": { "type": "string", "format": "binary" },
+                  "executor_name": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Updated" },
+          "404": { "description": "Not found" }
+        }
+      },
+      "delete": {
+        "operationId": "deleteTool",
+        "summary": "Delete a tool mapping by id",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": {
+          "200": { "description": "Deleted" },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+    "/api/config/seed": {
+      "post": {
+        "operationId": "seedConfig",
+        "summary": "Seed default agent definitions, prompts, and tool mappings",
+        "responses": {
+          "200": { "description": "Seed result", "content": { "application/json": { "schema": { "type": "object", "properties": { "status": { "type": "string" }, "agents_seeded": { "type": "integer" }, "prompts_seeded": { "type": "integer" }, "tools_seeded": { "type": "integer" }, "blobs_uploaded": { "type": "integer" } } } } } }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AgentDefinition": { "type": "object", "properties": { "id": { "type": "integer" }, "name": { "type": "string" }, "description": { "type": "string" }, "model": { "type": "string" }, "is_active": { "type": "boolean" } } },
+      "AgentDefinitionDetail": { "type": "object", "properties": { "id": { "type": "integer" }, "name": { "type": "string" }, "description": { "type": "string" }, "model": { "type": "string" }, "is_active": { "type": "boolean" }, "prompt": { "type": "object", "nullable": true, "properties": { "id": { "type": "integer" }, "blob_path": { "type": "string" }, "description": { "type": "string" } } }, "tools": { "type": "array", "items": { "type": "object", "properties": { "id": { "type": "integer" }, "tool_name": { "type": "string" }, "blob_path": { "type": "string" }, "executor_name": { "type": "string" } } } } } },
+      "PromptEntry": { "type": "object", "properties": { "id": { "type": "integer" }, "agent_id": { "type": "integer" }, "agent_name": { "type": "string" }, "blob_path": { "type": "string" }, "description": { "type": "string" }, "is_active": { "type": "boolean" } } },
+      "PromptContent": { "type": "object", "properties": { "id": { "type": "integer" }, "agent_id": { "type": "integer" }, "blob_path": { "type": "string" }, "description": { "type": "string" }, "content": { "type": "string" } } },
+      "ToolMappingEntry": { "type": "object", "properties": { "id": { "type": "integer" }, "agent_id": { "type": "integer" }, "agent_name": { "type": "string" }, "tool_name": { "type": "string" }, "blob_path": { "type": "string" }, "executor_name": { "type": "string" }, "is_active": { "type": "boolean" } } }
+    },
+    "securitySchemes": { "functionKey": { "type": "apiKey", "in": "query", "name": "code" } }
+  },
+  "security": [{ "functionKey": [] }]
+}

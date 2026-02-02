@@ -7,7 +7,7 @@ Database access, ORM models, and notification routing.
 | File | Purpose |
 |------|---------|
 | `util_database.py` | SQLAlchemy engine, session management, generic CRUD |
-| `util_datamodel.py` | ORM models: BaseModel, LLMTokenUsage |
+| `util_datamodel.py` | ORM models: AgentDefinition, AgentPromptRegistry, AgentToolMapping, LLMTokenUsage |
 | `util_notifications.py` | Notification recipient routing |
 
 ## Database

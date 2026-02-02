@@ -62,33 +62,54 @@ Gmail Inbox
 
 ## How to Add a New Agent
 
-### Step 1: Write instructions
+### Step 1: Create the agent definition
+Register the agent via the API (or let seeding handle it):
+```bash
+curl -X PUT http://localhost:7071/api/config/agents/my_agent \
+  -H "Content-Type: application/json" \
+  -d '{"description": "My custom agent", "model": "gpt-4o-mini"}'
+```
+This creates a row in the `AgentDefinition` table, which is the single source of truth for agent name, description, and model.
+
+### Step 2: Write instructions
 Create `agents/instructions/my_agent.system.md` with the agent's system prompt.
 
-### Step 2: Register the prompt
-Add an entry to `agents/instructions/prompts_registry.py`:
+### Step 3: Register the prompt
+Add a filesystem fallback entry to `agents/instructions/prompts_registry.py`:
 ```python
 PROMPTS = {
     ...
     "my_agent": "agents/instructions/my_agent.system.md",
 }
 ```
+Then upload the prompt via the API (links it to the agent definition):
+```bash
+curl -X PUT http://localhost:7071/api/config/prompts/my_agent \
+  -H "Content-Type: application/json" \
+  -d '{"content": "You are my agent...", "description": "System prompt for my_agent"}'
+```
 
-### Step 3: Define tools (optional)
+### Step 4: Define tools (optional)
 If your agent needs tools:
 - Create JSON schema files in `agents/tools/definitions/` (one per tool)
 - Add executor functions in `agents/tools/executors.py`
 
-### Step 4: Map tools to agent
-Add the mapping in `agents/tools/registry.py`:
+### Step 5: Map tools to agent
+Add the static fallback mapping in `agents/tools/registry.py`:
 ```python
 AGENT_TOOL_MAPPING = {
     ...
     "my_agent": ["my_tool_1", "my_tool_2"],
 }
 ```
+Or manage tool mappings via the API:
+```bash
+curl -X PUT http://localhost:7071/api/config/tools/my_agent/my_tool_1 \
+  -H "Content-Type: application/json" \
+  -d '{"definition": {...}, "executor_name": "my_tool_1"}'
+```
 
-### Step 5: Route to your agent
+### Step 6: Route to your agent
 Update the triage agent's instructions or the notification agent to route to your new agent via `next_action.payload.agent_type`.
 
 ## Project Structure
@@ -106,12 +127,30 @@ agents/
 shared/                      # Gmail API, Service Bus, token tracking
 ```
 
+## Agent Configuration API
+
+Agent definitions, prompts, and tool mappings are managed via REST endpoints under `/api/config/`:
+
+| Endpoint | Methods | Description |
+|----------|---------|-------------|
+| `/api/config/agents` | GET | List all agent definitions |
+| `/api/config/agents/{name}` | GET, PUT, DELETE | CRUD for a single agent (includes prompt + tools summary on GET) |
+| `/api/config/prompts` | GET | List all prompt registrations |
+| `/api/config/prompts/{agent_type}` | GET, PUT, DELETE | CRUD for an agent's prompt |
+| `/api/config/tools` | GET | List all tool mappings |
+| `/api/config/tools/{agent_type}` | GET | Get tool definitions for an agent |
+| `/api/config/tools/{agent_type}/{tool_name}` | PUT, DELETE | CRUD for a single tool mapping |
+| `/api/config/seed` | POST | Seed default agents, prompts, and tool mappings |
+
+The `AgentDefinition` table is the single source of truth for each agent's name, description, and model. The `AgentPromptRegistry` and `AgentToolMapping` tables reference it via foreign key (`AgentId`).
+
 ## Environment Variables
 
 See `local.settings.json.example` and `.env.example` for all required variables.
 
 | Variable | Purpose |
 |----------|---------|
+| `DEFAULT_AGENT_MODEL` | Fallback LLM model name for agents (default: `gpt-4o-mini`) |
 | `SERVICE_BUS_CONNECTION_STRING` | Azure Service Bus for async messaging |
 | `AZURE_TENANT_ID` / `CLIENT_ID` / `CLIENT_SECRET` | Azure AI agent runtime auth |
 | `AZURE_AI_ENDPOINT` | Azure AI Foundry endpoint |

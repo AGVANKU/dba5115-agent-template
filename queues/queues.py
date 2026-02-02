@@ -152,6 +152,15 @@ async def _start_orchestration(client: df.DurableOrchestrationClient, instance_i
         logging.info(f"Orchestration {instance_id} already running, skipping")
         return False
 
+    # Purge completed/failed/terminated instances so the ID can be reused
+    if status and status.runtime_status in [
+        df.OrchestrationRuntimeStatus.Completed,
+        df.OrchestrationRuntimeStatus.Failed,
+        df.OrchestrationRuntimeStatus.Terminated,
+    ]:
+        await client.purge_instance_history(instance_id)
+        logging.info(f"Purged old orchestration {instance_id} (was {status.runtime_status})")
+
     try:
         await client.start_new(
             "orchestrate_agent_workflow",

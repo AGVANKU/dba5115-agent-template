@@ -19,6 +19,7 @@ import azure.durable_functions as df
 # Import blueprints from each layer
 from hooks.hooks import bp as hooks_bp
 from queues.queues import bp as queues_bp
+from agents.api.config_routes import bp as config_bp
 
 # Initialize database tables on startup
 try:
@@ -27,12 +28,20 @@ try:
 except Exception as e:
     logging.warning(f"Could not initialize token usage table: {e}")
 
+# Auto-seed agent config (prompts + tools) into Blob + SQL
+try:
+    from agents.utility.util_seed import seed_defaults
+    seed_defaults()
+except Exception as e:
+    logging.warning(f"Could not auto-seed agent config: {e}")
+
 # Create main app with Durable Functions support
 app = df.DFApp(http_auth_level=func.AuthLevel.FUNCTION)
 
 # Register all blueprints (order: hooks -> agents)
 app.register_functions(hooks_bp)
 app.register_functions(queues_bp)
+app.register_functions(config_bp)
 
 
 # =============================================================================

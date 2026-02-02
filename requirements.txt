@@ -2,6 +2,7 @@ azure-functions
 azure-functions-durable
 azure-identity
 azure-servicebus
+azure-storage-blob
 pyodbc
 sqlalchemy
 google-api-python-client

@@ -1,0 +1,18 @@
+{
+  "name": "my_tool",
+  "description": "Describe what this tool does — the agent uses this to decide when to call it.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "param1": {
+        "type": "string",
+        "description": "Describe this parameter"
+      },
+      "param2": {
+        "type": "integer",
+        "description": "Describe this parameter"
+      }
+    },
+    "required": ["param1"]
+  }
+}

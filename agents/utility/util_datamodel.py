@@ -60,6 +60,110 @@ class BaseModel(Base, IdMixin, TimestampMixin):
         return d
 
 
+class AgentDefinition(BaseModel):
+    """Central agent definition — single source of truth for agent name, description, and model."""
+    __tablename__ = "AgentDefinition"
+
+    __upsert_keys__ = ["name"]
+
+    __create_sql__ = """
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='AgentDefinition' AND xtype='U')
+    CREATE TABLE AgentDefinition (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        Name NVARCHAR(100) NOT NULL UNIQUE,
+        Description NVARCHAR(500) NULL,
+        Model NVARCHAR(100) NOT NULL,
+        IsActive BIT NOT NULL DEFAULT 1,
+        CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
+        UpdatedAt DATETIME
+    )
+    """
+
+    name: Mapped[str] = mapped_column("Name", String(100), nullable=False, unique=True)
+    description: Mapped[str | None] = mapped_column("Description", String(500), nullable=True)
+    model: Mapped[str] = mapped_column("Model", String(100), nullable=False)
+    is_active: Mapped[bool] = mapped_column("IsActive", Integer, nullable=False, default=1)
+
+    def __repr__(self) -> str:
+        return f"<AgentDefinition name={self.name!r} model={self.model!r}>"
+
+
+class AgentPromptRegistry(BaseModel):
+    """Registry mapping agents to their system prompt blobs."""
+    __tablename__ = "AgentPromptRegistry"
+
+    __upsert_keys__ = ["agent_id"]
+
+    __create_sql__ = """
+    -- Migrate: drop old table if it still has AgentType column
+    IF EXISTS (
+        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_NAME = 'AgentPromptRegistry' AND COLUMN_NAME = 'AgentType'
+    )
+    DROP TABLE AgentPromptRegistry;
+
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='AgentPromptRegistry' AND xtype='U')
+    CREATE TABLE AgentPromptRegistry (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        AgentId INT NOT NULL,
+        BlobPath NVARCHAR(500) NOT NULL,
+        Description NVARCHAR(500) NULL,
+        IsActive BIT NOT NULL DEFAULT 1,
+        CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
+        UpdatedAt DATETIME,
+        CONSTRAINT FK_PromptRegistry_AgentDef FOREIGN KEY (AgentId) REFERENCES AgentDefinition(Id),
+        CONSTRAINT UQ_PromptRegistry_AgentId UNIQUE (AgentId)
+    )
+    """
+
+    agent_id: Mapped[int] = mapped_column("AgentId", Integer, nullable=False)
+    blob_path: Mapped[str] = mapped_column("BlobPath", String(500), nullable=False)
+    description: Mapped[str | None] = mapped_column("Description", String(500), nullable=True)
+    is_active: Mapped[bool] = mapped_column("IsActive", Integer, nullable=False, default=1)
+
+    def __repr__(self) -> str:
+        return f"<AgentPromptRegistry agent_id={self.agent_id!r}>"
+
+
+class AgentToolMapping(BaseModel):
+    """Maps agents to their tool definitions in blob storage."""
+    __tablename__ = "AgentToolMapping"
+
+    __upsert_keys__ = ["agent_id", "tool_name"]
+
+    __create_sql__ = """
+    -- Migrate: drop old table if it still has AgentType column
+    IF EXISTS (
+        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_NAME = 'AgentToolMapping' AND COLUMN_NAME = 'AgentType'
+    )
+    DROP TABLE AgentToolMapping;
+
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='AgentToolMapping' AND xtype='U')
+    CREATE TABLE AgentToolMapping (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        AgentId INT NOT NULL,
+        ToolName NVARCHAR(100) NOT NULL,
+        BlobPath NVARCHAR(500) NOT NULL,
+        ExecutorName NVARCHAR(100) NOT NULL,
+        IsActive BIT NOT NULL DEFAULT 1,
+        CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
+        UpdatedAt DATETIME,
+        CONSTRAINT FK_ToolMapping_AgentDef FOREIGN KEY (AgentId) REFERENCES AgentDefinition(Id),
+        CONSTRAINT UQ_AgentToolMapping UNIQUE (AgentId, ToolName)
+    )
+    """
+
+    agent_id: Mapped[int] = mapped_column("AgentId", Integer, nullable=False)
+    tool_name: Mapped[str] = mapped_column("ToolName", String(100), nullable=False)
+    blob_path: Mapped[str] = mapped_column("BlobPath", String(500), nullable=False)
+    executor_name: Mapped[str] = mapped_column("ExecutorName", String(100), nullable=False)
+    is_active: Mapped[bool] = mapped_column("IsActive", Integer, nullable=False, default=1)
+
+    def __repr__(self) -> str:
+        return f"<AgentToolMapping agent_id={self.agent_id!r} tool={self.tool_name!r}>"
+
+
 class LLMTokenUsage(BaseModel):
     """Track LLM token usage for analytics and cost reporting."""
     __tablename__ = "LLMTokenUsage"

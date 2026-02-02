@@ -22,22 +22,37 @@ agents/
 
 ## Adding a New Agent (Step by Step)
 
-### 1. Create system prompt
+### 1. Create the agent definition
+Register the agent in the `AgentDefinition` table via the API:
+```bash
+curl -X PUT http://localhost:7071/api/config/agents/my_agent \
+  -H "Content-Type: application/json" \
+  -d '{"description": "My custom agent", "model": "gpt-4o-mini"}'
+```
+This is the single source of truth for the agent's name, description, and model. The model can be changed at any time without redeploying code.
+
+### 2. Create system prompt
 ```
 agents/instructions/my_agent.system.md
 ```
 Write the agent's personality, rules, and expected JSON output format.
 
-### 2. Register prompt
-In `agents/instructions/prompts_registry.py`:
+### 3. Register prompt
+Add a filesystem fallback entry in `agents/instructions/prompts_registry.py`:
 ```python
 PROMPTS = {
     ...
     "my_agent": "agents/instructions/my_agent.system.md",
 }
 ```
+Then upload the prompt via API to link it to the agent definition:
+```bash
+curl -X PUT http://localhost:7071/api/config/prompts/my_agent \
+  -H "Content-Type: application/json" \
+  -d '{"content": "...", "description": "System prompt for my_agent"}'
+```
 
-### 3. Define tools (if needed)
+### 4. Define tools (if needed)
 Create `agents/tools/definitions/my_tool.json`:
 ```json
 {
@@ -53,7 +68,7 @@ Create `agents/tools/definitions/my_tool.json`:
 }
 ```
 
-### 4. Implement executor (if needed)
+### 5. Implement executor (if needed)
 In `agents/tools/executors.py`:
 ```python
 def my_tool(param1, **_):
@@ -61,16 +76,22 @@ def my_tool(param1, **_):
     return {"status": "success", "result": "..."}
 ```
 
-### 5. Map tools to agent
-In `agents/tools/registry.py`:
+### 6. Map tools to agent
+Add a static fallback in `agents/tools/registry.py`:
 ```python
 AGENT_TOOL_MAPPING = {
     ...
     "my_agent": ["my_tool"],
 }
 ```
+Or manage via API:
+```bash
+curl -X PUT http://localhost:7071/api/config/tools/my_agent/my_tool \
+  -H "Content-Type: application/json" \
+  -d '{"definition": {...}, "executor_name": "my_tool"}'
+```
 
-### 6. Route to your agent
+### 7. Route to your agent
 Update `email_triage.system.md` to include your agent type in classification, or have another agent's `next_action` route to `my_agent`.
 
 ## Agent Lifecycle

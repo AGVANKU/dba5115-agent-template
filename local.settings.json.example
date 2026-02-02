@@ -23,6 +23,9 @@
 
     "NUS_EMAIL": "<admin-email-to-monitor-and-notify>",
 
+    "AGENT_CONFIG_BLOB_CONN_STR": "<your-blob-storage-connection-string>",
+    "AGENT_CONFIG_CONTAINER": "agent-config",
+
     "FUNC_BASE_URL": "http://localhost:7071/api",
     "FUNC_KEY": ""
   }
