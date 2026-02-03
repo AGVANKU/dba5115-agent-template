@@ -65,48 +65,57 @@ Gmail Inbox
 ### Step 1: Create the agent definition
 Register the agent via the API (or let seeding handle it):
 ```bash
-curl -X PUT http://localhost:7071/api/config/agents/my_agent \
+curl -X POST http://localhost:7071/api/config/agents \
   -H "Content-Type: application/json" \
-  -d '{"description": "My custom agent", "model": "gpt-4o-mini"}'
+  -d '{"name": "my_agent", "description": "My custom agent", "model": "gpt-4o-mini"}'
+# Returns: {"status": "created", "id": 3, ...}
 ```
-This creates a row in the `AgentDefinition` table, which is the single source of truth for agent name, description, and model.
+This creates a row in the `AgentDefinition` table (returns the `id`), which is the single source of truth for agent name, description, and model.
 
 ### Step 2: Write instructions
-Create `agents/instructions/my_agent.system.md` with the agent's system prompt.
+Create a `.system.md` file for your agent's system prompt. Use `_sample_agent.system.md` as a template:
+```bash
+cp agents/instructions/_sample_agent.system.md agents/instructions/my_agent.system.md
+# Edit my_agent.system.md with your agent's instructions
+```
 
 ### Step 3: Register the prompt
-Add a filesystem fallback entry to `agents/instructions/prompts_registry.py`:
-```python
-PROMPTS = {
-    ...
-    "my_agent": "agents/instructions/my_agent.system.md",
-}
-```
-Then upload the prompt via the API (links it to the agent definition):
+Upload the prompt file via the API using the `agent_id` from step 1 (the agent must exist first):
 ```bash
-curl -X PUT http://localhost:7071/api/config/prompts/my_agent \
+curl -X POST http://localhost:7071/api/config/prompts \
+  -F agent_id=3 \
+  -F description="System prompt for my_agent" \
+  -F file=@agents/instructions/my_agent.system.md
+```
+Alternatively, you can post the content directly as JSON:
+```bash
+curl -X POST http://localhost:7071/api/config/prompts \
   -H "Content-Type: application/json" \
-  -d '{"content": "You are my agent...", "description": "System prompt for my_agent"}'
+  -d '{"agent_id": 3, "content": "You are my agent...", "description": "System prompt"}'
 ```
 
 ### Step 4: Define tools (optional)
-If your agent needs tools:
-- Create JSON schema files in `agents/tools/definitions/` (one per tool)
-- Add executor functions in `agents/tools/executors.py`
+If your agent needs tools, create a `.json` file for each tool definition. Use `_sample_tool.json` as a template:
+```bash
+cp agents/tools/definitions/_sample_tool.json agents/tools/definitions/my_tool.json
+# Edit my_tool.json with your tool's schema
+```
+Then add the executor function in `agents/tools/executors.py`.
 
 ### Step 5: Map tools to agent
-Add the static fallback mapping in `agents/tools/registry.py`:
-```python
-AGENT_TOOL_MAPPING = {
-    ...
-    "my_agent": ["my_tool_1", "my_tool_2"],
-}
-```
-Or manage tool mappings via the API:
+Upload the tool definition file via the API using the `agent_id` from step 1 (the agent must exist first):
 ```bash
-curl -X PUT http://localhost:7071/api/config/tools/my_agent/my_tool_1 \
+curl -X POST http://localhost:7071/api/config/tools \
+  -F agent_id=3 \
+  -F tool_name=my_tool \
+  -F executor_name=my_tool \
+  -F file=@agents/tools/definitions/my_tool.json
+```
+Alternatively, you can post the definition directly as JSON:
+```bash
+curl -X POST http://localhost:7071/api/config/tools \
   -H "Content-Type: application/json" \
-  -d '{"definition": {...}, "executor_name": "my_tool_1"}'
+  -d '{"agent_id": 3, "tool_name": "my_tool", "definition": {...}, "executor_name": "my_tool"}'
 ```
 
 ### Step 6: Route to your agent
@@ -133,13 +142,12 @@ Agent definitions, prompts, and tool mappings are managed via REST endpoints und
 
 | Endpoint | Methods | Description |
 |----------|---------|-------------|
-| `/api/config/agents` | GET | List all agent definitions |
-| `/api/config/agents/{name}` | GET, PUT, DELETE | CRUD for a single agent (includes prompt + tools summary on GET) |
-| `/api/config/prompts` | GET | List all prompt registrations |
-| `/api/config/prompts/{agent_type}` | GET, PUT, DELETE | CRUD for an agent's prompt |
-| `/api/config/tools` | GET | List all tool mappings |
-| `/api/config/tools/{agent_type}` | GET | Get tool definitions for an agent |
-| `/api/config/tools/{agent_type}/{tool_name}` | PUT, DELETE | CRUD for a single tool mapping |
+| `/api/config/agents` | GET, POST | List all / create new agent definition |
+| `/api/config/agents/{id}` | GET, PUT, DELETE | Get, update, or delete agent by id |
+| `/api/config/prompts` | GET, POST | List all / create new prompt (JSON or file upload) |
+| `/api/config/prompts/{id}` | GET, PUT, DELETE | Get (includes content), update, or delete prompt by id |
+| `/api/config/tools` | GET, POST | List all / create new tool mapping (JSON or file upload) |
+| `/api/config/tools/{id}` | GET, PUT, DELETE | Get (includes definition), update, or delete tool mapping by id |
 | `/api/config/seed` | POST | Seed default agents, prompts, and tool mappings |
 
 The `AgentDefinition` table is the single source of truth for each agent's name, description, and model. The `AgentPromptRegistry` and `AgentToolMapping` tables reference it via foreign key (`AgentId`).
