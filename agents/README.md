@@ -62,10 +62,16 @@ cp agents/tools/definitions/_sample_tool.json agents/tools/definitions/my_tool.j
 # Edit my_tool.json with your tool's schema
 ```
 
+**Important — Naming Convention:**
+The following must all match to link the tool definition to its executor:
+- `name` field inside the `.json` definition
+- `tool_name` when calling the API
+- Python function name in `executors.py`
+
 ### 5. Implement executor (if needed)
 In `agents/tools/executors.py`:
 ```python
-def my_tool(param1, **_):
+def my_tool(param1, **_):  # Function name must match tool_name
     # Your logic here
     return {"status": "success", "result": "..."}
 ```
@@ -85,6 +91,8 @@ curl -X POST http://localhost:7071/api/config/tools \
   -H "Content-Type: application/json" \
   -d '{"agent_id": 3, "tool_name": "my_tool", "definition": {...}, "executor_name": "my_tool"}'
 ```
+
+**Note:** `executor_name` tells the runtime which Python function to call. It defaults to `tool_name` if not specified.
 
 ### 7. Route to your agent
 Update `email_triage.system.md` to include your agent type in classification, or have another agent's `next_action` route to `my_agent`.
