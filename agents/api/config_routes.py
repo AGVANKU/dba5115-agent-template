@@ -177,9 +177,14 @@ def update_agent(req: func.HttpRequest) -> func.HttpResponse:
 
 @bp.route(route="config/agents/{id}", methods=["DELETE"], auth_level=func.AuthLevel.FUNCTION)
 def delete_agent(req: func.HttpRequest) -> func.HttpResponse:
-    """Delete an agent definition. Rejects if prompt or tool mappings still reference it."""
+    """Delete an agent definition with cascade delete of prompts and tool mappings.
+
+    - Prompts: Deletes DB row and blob file
+    - Tool mappings: Deletes DB row, only deletes blob if no other agent uses the same tool_name
+    """
     from agents.utility.util_database import get_session
     from agents.utility.util_datamodel import AgentPromptRegistry, AgentToolMapping
+    from agents.utility.util_blob import delete_blob
 
     try:
         agent_id = int(req.route_params["id"])
@@ -192,16 +197,56 @@ def delete_agent(req: func.HttpRequest) -> func.HttpResponse:
             agent = _get_agent_by_id(session, agent_id)
             if not agent:
                 return _error("Agent not found", 404)
-            prompt_count = session.query(AgentPromptRegistry).filter(AgentPromptRegistry.agent_id == agent_id).count()
-            tool_count = session.query(AgentToolMapping).filter(AgentToolMapping.agent_id == agent_id).count()
-            if prompt_count > 0 or tool_count > 0:
-                return _json_response({
-                    "error": "Cannot delete agent with existing prompt or tool mappings. Delete those first.",
-                    "prompt_count": prompt_count,
-                    "tool_count": tool_count,
-                }, 409)
+
+            deleted_prompts = 0
+            deleted_tools = 0
+            deleted_blobs = 0
+
+            # Delete prompts (each agent has unique blob path)
+            prompts = session.query(AgentPromptRegistry).filter(AgentPromptRegistry.agent_id == agent_id).all()
+            for prompt in prompts:
+                try:
+                    delete_blob(prompt.blob_path)
+                    deleted_blobs += 1
+                except Exception:
+                    logging.warning(f"Blob {prompt.blob_path} not found during cascade delete")
+                session.delete(prompt)
+                deleted_prompts += 1
+
+            # Delete tool mappings (blob shared by tool_name — only delete if no other agent uses it)
+            tools = session.query(AgentToolMapping).filter(AgentToolMapping.agent_id == agent_id).all()
+            for tool in tools:
+                # Check if other agents reference the same tool_name
+                other_refs = session.query(AgentToolMapping).filter(
+                    AgentToolMapping.tool_name == tool.tool_name,
+                    AgentToolMapping.agent_id != agent_id
+                ).count()
+
+                if other_refs == 0:
+                    # No other agent uses this tool — safe to delete blob
+                    try:
+                        delete_blob(tool.blob_path)
+                        deleted_blobs += 1
+                    except Exception:
+                        logging.warning(f"Blob {tool.blob_path} not found during cascade delete")
+                else:
+                    logging.info(f"Keeping blob {tool.blob_path} — still referenced by {other_refs} other agent(s)")
+
+                session.delete(tool)
+                deleted_tools += 1
+
+            # Delete the agent
             session.delete(agent)
-        return _json_response({"status": "deleted"})
+
+        return _json_response({
+            "status": "deleted",
+            "agent_id": agent_id,
+            "cascade": {
+                "prompts_deleted": deleted_prompts,
+                "tool_mappings_deleted": deleted_tools,
+                "blobs_deleted": deleted_blobs
+            }
+        })
     except Exception as e:
         logging.exception("delete_agent error")
         return _error(str(e), 500)
