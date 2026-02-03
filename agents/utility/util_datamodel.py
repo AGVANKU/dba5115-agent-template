@@ -205,7 +205,8 @@ class LLMTokenUsage(BaseModel):
         Id INT IDENTITY(1,1) PRIMARY KEY,
         StudentConfigId INT NULL,
         StudentId NVARCHAR(50) NULL,
-        AgentType NVARCHAR(50) NOT NULL,
+        AgentId INT NULL,
+        AgentType NVARCHAR(50) NULL,
         AgentOperation NVARCHAR(50) NULL,
         ModelName NVARCHAR(50) NOT NULL,
         InputTokens INT NOT NULL,
@@ -218,12 +219,29 @@ class LLMTokenUsage(BaseModel):
         UpdatedAt DATETIME NULL
     );
 
-    -- Migration: add StudentConfigId/StudentId if missing (NUS compatibility)
+    -- Migration: add columns if missing (shared table across projects)
     IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='LLMTokenUsage' AND COLUMN_NAME='StudentConfigId')
     ALTER TABLE LLMTokenUsage ADD StudentConfigId INT NULL;
 
     IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='LLMTokenUsage' AND COLUMN_NAME='StudentId')
     ALTER TABLE LLMTokenUsage ADD StudentId NVARCHAR(50) NULL;
+
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='LLMTokenUsage' AND COLUMN_NAME='AgentId')
+    ALTER TABLE LLMTokenUsage ADD AgentId INT NULL;
+
+    -- Conditional FKs: only add if referenced table exists
+    IF OBJECT_ID('StudentConfig', 'U') IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_LLMTokenUsage_Config')
+    ALTER TABLE LLMTokenUsage ADD CONSTRAINT FK_LLMTokenUsage_Config
+        FOREIGN KEY (StudentConfigId) REFERENCES StudentConfig(Id) ON DELETE CASCADE;
+
+    IF OBJECT_ID('AgentDefinition', 'U') IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_LLMTokenUsage_AgentDef')
+    ALTER TABLE LLMTokenUsage ADD CONSTRAINT FK_LLMTokenUsage_AgentDef
+        FOREIGN KEY (AgentId) REFERENCES AgentDefinition(Id);
+
+    IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='idx_llm_agent_id' AND object_id = OBJECT_ID('LLMTokenUsage'))
+    CREATE INDEX idx_llm_agent_id ON LLMTokenUsage(AgentId);
 
     IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='idx_llm_agent_type' AND object_id = OBJECT_ID('LLMTokenUsage'))
     CREATE INDEX idx_llm_agent_type ON LLMTokenUsage(AgentType);
@@ -248,10 +266,15 @@ class LLMTokenUsage(BaseModel):
     )
 
     # Agent context
-    agent_type: Mapped[str] = mapped_column(
+    agent_id: Mapped[int | None] = mapped_column(
+        "AgentId",
+        Integer,
+        nullable=True
+    )
+    agent_type: Mapped[str | None] = mapped_column(
         "AgentType",
         String(50),
-        nullable=False
+        nullable=True
     )
     agent_operation: Mapped[str | None] = mapped_column(
         "AgentOperation",

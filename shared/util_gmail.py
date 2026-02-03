@@ -273,9 +273,17 @@ def send_email(service, to: str, subject: str, body: str, reply_to_message_id: s
     is_html = body.strip().startswith('<!DOCTYPE') or body.strip().startswith('<html')
     mime_subtype = "html" if is_html else "plain"
     
+    # Set display name on From header if configured
+    # Gmail API requires "Name <email>" format; email must match the authenticated account.
+    from_name = os.getenv("GMAIL_FROM_NAME", "")
+    from_email = os.getenv("GMAIL_FROM_EMAIL", "")
+    from_header = f"{from_name} <{from_email}>" if from_name and from_email else None
+
     if attachments:
         # Multipart message with attachments
         message = MIMEMultipart()
+        if from_header:
+            message["from"] = from_header
         message["to"] = to
         if cc:
             message["cc"] = cc
@@ -299,6 +307,8 @@ def send_email(service, to: str, subject: str, body: str, reply_to_message_id: s
     else:
         # Simple message (HTML or plain text)
         message = MIMEText(body, mime_subtype)
+        if from_header:
+            message["from"] = from_header
         message["to"] = to
         if cc:
             message["cc"] = cc
