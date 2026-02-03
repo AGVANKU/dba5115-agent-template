@@ -26,8 +26,9 @@ def track_token_usage(
     model_name: str,
     input_tokens: int,
     output_tokens: int,
-    agent_type: str,
     started_at: datetime,
+    agent_id: Optional[int] = None,
+    agent_type: Optional[str] = None,
     student_config_id: Optional[int] = None,
     student_id: Optional[str] = None,
     agent_operation: Optional[str] = None,
@@ -55,8 +56,10 @@ def track_token_usage(
         {"success": bool, "id": int (if success), "error": str (if failed)}
     """
     try:
-        if not model_name or not agent_type:
-            return {"success": False, "error": "model_name and agent_type are required"}
+        if not model_name:
+            return {"success": False, "error": "model_name is required"}
+        if not agent_id and not agent_type:
+            return {"success": False, "error": "agent_id or agent_type is required"}
 
         if input_tokens < 0 or output_tokens < 0:
             return {"success": False, "error": "Token counts cannot be negative"}
@@ -74,6 +77,7 @@ def track_token_usage(
         session = SessionLocal()
         try:
             record = LLMTokenUsage(
+                agent_id=agent_id,
                 agent_type=agent_type,
                 agent_operation=agent_operation,
                 model_name=model_name,
@@ -119,6 +123,7 @@ def track_token_usage(
             with open(fallback_file, "a") as f:
                 f.write(json.dumps({
                     "timestamp": datetime.utcnow().isoformat(),
+                    "agent_id": agent_id,
                     "agent_type": agent_type,
                     "agent_operation": agent_operation,
                     "model_name": model_name,

@@ -44,7 +44,23 @@ def orchestrate_agent_workflow(context: df.DurableOrchestrationContext):
     # Track tokens using agent-provided metadata
     if not context.is_replaying:
         metadata = result.metadata or {}
+
+        # Resolve agent_id from AgentDefinition (nullable for external callers)
+        agent_id = None
+        try:
+            from agents.utility.util_database import get_session
+            from agents.utility.util_datamodel import AgentDefinition
+            with get_session() as session:
+                agent_def = session.query(AgentDefinition).filter(
+                    AgentDefinition.name == agent_type
+                ).first()
+                if agent_def:
+                    agent_id = agent_def.id
+        except Exception:
+            pass
+
         track_token_usage(
+            agent_id=agent_id,
             student_config_id=input_data.get("student_config_id"),
             student_id=input_data.get("StudentId") or input_data.get("student_id"),
             agent_type=agent_type,

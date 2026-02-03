@@ -156,6 +156,8 @@ See `local.settings.json.example` and `.env.example` for all required variables.
 | `AZURE_AI_ENDPOINT` | Azure AI Foundry endpoint |
 | `DB_SERVER` / `DB_DATABASE` / `DB_USERNAME` / `DB_PASSWORD` | SQL Server for token tracking |
 | `GMAIL_CLIENT_ID` / `CLIENT_SECRET` / `REFRESH_TOKEN` | Gmail API OAuth |
+| `GMAIL_FROM_NAME` | Display name for outgoing emails (e.g., "DBA5115 Course Admin") |
+| `GMAIL_FROM_EMAIL` | Gmail sending address (must match authenticated account) |
 | `NUS_EMAIL` | Admin email address (inbox to monitor + notification recipient) |
 
 ## Token Tracking
