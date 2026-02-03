@@ -100,7 +100,14 @@ If your agent needs tools, create a `.json` file for each tool definition. Use `
 cp agents/tools/definitions/_sample_tool.json agents/tools/definitions/my_tool.json
 # Edit my_tool.json with your tool's schema
 ```
-Then add the executor function in `agents/tools/executors.py`.
+
+**Important:** The `name` field inside the JSON definition, the `tool_name` in the API, and the Python executor function name must all match. This naming convention links the tool definition to its executor.
+
+Then add the executor function in `agents/tools/executors.py`:
+```python
+def my_tool(param1, **_):  # Function name must match tool_name
+    return {"status": "success", "result": "..."}
+```
 
 ### Step 5: Map tools to agent
 Upload the tool definition file via the API using the `agent_id` from step 1 (the agent must exist first):
@@ -117,6 +124,8 @@ curl -X POST http://localhost:7071/api/config/tools \
   -H "Content-Type: application/json" \
   -d '{"agent_id": 3, "tool_name": "my_tool", "definition": {...}, "executor_name": "my_tool"}'
 ```
+
+**Note:** `executor_name` tells the runtime which Python function to call. It defaults to `tool_name` if not specified.
 
 ### Step 6: Route to your agent
 Update the triage agent's instructions or the notification agent to route to your new agent via `next_action.payload.agent_type`.
