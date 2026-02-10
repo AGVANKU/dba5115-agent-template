@@ -26,7 +26,7 @@
       },
       "sections": {
         "type": "array",
-        "description": "Array of section objects with type and data (e.g. executive_summary, status_box, resource_list, next_steps, alert, code_block)",
+        "description": "Array of section objects with type and data (e.g. executive_summary, status_box, resource_list, next_steps, alert, code_block, bullet_list)",
         "items": {
           "type": "object"
         }

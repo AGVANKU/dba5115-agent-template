@@ -33,14 +33,15 @@
                 "properties": {
                   "name": { "type": "string" },
                   "description": { "type": "string" },
-                  "model": { "type": "string", "default": "gpt-4o-mini" }
+                  "model": { "type": "string", "default": "gpt-4o-mini" },
+                  "knowledge_source": { "type": "string", "description": "Blob path for knowledge files (e.g., 'knowledge/my_docs')" }
                 }
               }
             }
           }
         },
         "responses": {
-          "201": { "description": "Agent created", "content": { "application/json": { "schema": { "type": "object", "properties": { "status": { "type": "string" }, "id": { "type": "integer" }, "name": { "type": "string" }, "model": { "type": "string" } } } } } },
+          "201": { "description": "Agent created", "content": { "application/json": { "schema": { "type": "object", "properties": { "status": { "type": "string" }, "id": { "type": "integer" }, "name": { "type": "string" }, "model": { "type": "string" }, "knowledge_source": { "type": "string", "nullable": true } } } } } },
           "409": { "description": "Agent name already exists" }
         }
       }
@@ -69,6 +70,7 @@
                   "name": { "type": "string" },
                   "description": { "type": "string" },
                   "model": { "type": "string" },
+                  "knowledge_source": { "type": "string", "description": "Blob path for knowledge files. Changing this clears the vector store cache." },
                   "is_active": { "type": "boolean" }
                 }
               }
@@ -82,12 +84,103 @@
       },
       "delete": {
         "operationId": "deleteAgent",
-        "summary": "Delete an agent definition by id",
+        "summary": "Delete an agent definition by id (cascades to prompts, tools, vector store)",
         "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
         "responses": {
-          "200": { "description": "Deleted" },
-          "404": { "description": "Not found" },
-          "409": { "description": "Cannot delete — has dependent prompt or tool rows" }
+          "200": { "description": "Deleted with cascade info" },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+    "/api/config/agents/{id}/knowledge": {
+      "get": {
+        "operationId": "listKnowledgeFiles",
+        "summary": "List files in an agent's knowledge source",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": {
+          "200": {
+            "description": "List of knowledge files",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "agent_id": { "type": "integer" },
+                    "knowledge_source": { "type": "string" },
+                    "files": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": { "type": "string" },
+                          "path": { "type": "string" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Agent has no knowledge_source configured" },
+          "404": { "description": "Agent not found" }
+        }
+      },
+      "post": {
+        "operationId": "uploadKnowledgeFile",
+        "summary": "Upload a file to an agent's knowledge source",
+        "description": "Uploads a document (PDF, TXT, MD, DOCX) to the agent's knowledge source. Triggers reindex on next agent run.",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": { "type": "string", "format": "binary", "description": "Document file (PDF, TXT, MD, DOCX)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "File uploaded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string" },
+                    "agent_id": { "type": "integer" },
+                    "filename": { "type": "string" },
+                    "blob_path": { "type": "string" },
+                    "note": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Agent has no knowledge_source configured or invalid request" },
+          "404": { "description": "Agent not found" }
+        }
+      }
+    },
+    "/api/config/agents/{id}/knowledge/{filename}": {
+      "delete": {
+        "operationId": "deleteKnowledgeFile",
+        "summary": "Delete a file from an agent's knowledge source",
+        "description": "Removes a document from the knowledge source. Triggers reindex on next agent run.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "filename", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "File deleted" },
+          "400": { "description": "Agent has no knowledge_source configured" },
+          "404": { "description": "Agent or file not found" }
         }
       }
     },
@@ -299,8 +392,8 @@
   },
   "components": {
     "schemas": {
-      "AgentDefinition": { "type": "object", "properties": { "id": { "type": "integer" }, "name": { "type": "string" }, "description": { "type": "string" }, "model": { "type": "string" }, "is_active": { "type": "boolean" } } },
-      "AgentDefinitionDetail": { "type": "object", "properties": { "id": { "type": "integer" }, "name": { "type": "string" }, "description": { "type": "string" }, "model": { "type": "string" }, "is_active": { "type": "boolean" }, "prompt": { "type": "object", "nullable": true, "properties": { "id": { "type": "integer" }, "blob_path": { "type": "string" }, "description": { "type": "string" } } }, "tools": { "type": "array", "items": { "type": "object", "properties": { "id": { "type": "integer" }, "tool_name": { "type": "string" }, "blob_path": { "type": "string" }, "executor_name": { "type": "string" } } } } } },
+      "AgentDefinition": { "type": "object", "properties": { "id": { "type": "integer" }, "name": { "type": "string" }, "description": { "type": "string" }, "model": { "type": "string" }, "knowledge_source": { "type": "string", "nullable": true }, "is_active": { "type": "boolean" } } },
+      "AgentDefinitionDetail": { "type": "object", "properties": { "id": { "type": "integer" }, "name": { "type": "string" }, "description": { "type": "string" }, "model": { "type": "string" }, "knowledge_source": { "type": "string", "nullable": true }, "vector_store_id": { "type": "string", "nullable": true }, "last_indexed_at": { "type": "string", "format": "date-time", "nullable": true }, "is_active": { "type": "boolean" }, "prompt": { "type": "object", "nullable": true, "properties": { "id": { "type": "integer" }, "blob_path": { "type": "string" }, "description": { "type": "string" } } }, "tools": { "type": "array", "items": { "type": "object", "properties": { "id": { "type": "integer" }, "tool_name": { "type": "string" }, "blob_path": { "type": "string" }, "executor_name": { "type": "string" } } } } } },
       "PromptEntry": { "type": "object", "properties": { "id": { "type": "integer" }, "agent_id": { "type": "integer" }, "agent_name": { "type": "string" }, "blob_path": { "type": "string" }, "description": { "type": "string" }, "is_active": { "type": "boolean" } } },
       "PromptContent": { "type": "object", "properties": { "id": { "type": "integer" }, "agent_id": { "type": "integer" }, "blob_path": { "type": "string" }, "description": { "type": "string" }, "content": { "type": "string" } } },
       "ToolMappingEntry": { "type": "object", "properties": { "id": { "type": "integer" }, "agent_id": { "type": "integer" }, "agent_name": { "type": "string" }, "tool_name": { "type": "string" }, "blob_path": { "type": "string" }, "executor_name": { "type": "string" }, "is_active": { "type": "boolean" } } }

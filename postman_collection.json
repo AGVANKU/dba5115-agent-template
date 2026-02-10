@@ -8,7 +8,8 @@
     { "key": "functionKey", "value": "" },
     { "key": "agentId", "value": "" },
     { "key": "promptId", "value": "" },
-    { "key": "toolId", "value": "" }
+    { "key": "toolId", "value": "" },
+    { "key": "filename", "value": "" }
   ],
   "auth": {
     "type": "apikey",
@@ -109,7 +110,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"my_new_agent\",\n  \"description\": \"My custom agent that does X\",\n  \"model\": \"gpt-4o-mini\"\n}"
+              "raw": "{\n  \"name\": \"my_new_agent\",\n  \"description\": \"My custom agent that does X\",\n  \"model\": \"gpt-4o-mini\",\n  \"knowledge_source\": \"knowledge/my_docs\"\n}"
             }
           }
         },
@@ -143,7 +144,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"description\": \"Updated description\",\n  \"model\": \"gpt-4o\"\n}"
+              "raw": "{\n  \"description\": \"Updated description\",\n  \"model\": \"gpt-4o\",\n  \"knowledge_source\": \"knowledge/updated_docs\"\n}"
             }
           }
         },
@@ -151,11 +152,59 @@
           "name": "Delete Agent",
           "request": {
             "method": "DELETE",
-            "description": "Deletes an agent definition by id. Returns 409 if prompts or tool mappings still reference it.",
+            "description": "Deletes an agent definition by id. Cascade deletes prompts, tool mappings, and vector store.",
             "url": {
               "raw": "{{baseUrl}}/api/config/agents/{{agentId}}",
               "host": ["{{baseUrl}}"],
               "path": ["api", "config", "agents", "{{agentId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Knowledge Files",
+      "description": "Manage knowledge base files for agents with knowledge_source configured. Files are indexed into a vector store on the next agent run.",
+      "item": [
+        {
+          "name": "List Knowledge Files",
+          "request": {
+            "method": "GET",
+            "description": "Lists all files in the agent's knowledge source. Agent must have knowledge_source configured.",
+            "url": {
+              "raw": "{{baseUrl}}/api/config/agents/{{agentId}}/knowledge",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "agents", "{{agentId}}", "knowledge"]
+            }
+          }
+        },
+        {
+          "name": "Upload Knowledge File",
+          "request": {
+            "method": "POST",
+            "description": "Uploads a document (PDF, TXT, MD, DOCX) to the agent's knowledge source. Triggers reindex on next agent run.",
+            "url": {
+              "raw": "{{baseUrl}}/api/config/agents/{{agentId}}/knowledge",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "agents", "{{agentId}}", "knowledge"]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": "", "description": "Document file (PDF, TXT, MD, DOCX)" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Knowledge File",
+          "request": {
+            "method": "DELETE",
+            "description": "Deletes a file from the agent's knowledge source. Triggers reindex on next agent run.",
+            "url": {
+              "raw": "{{baseUrl}}/api/config/agents/{{agentId}}/knowledge/{{filename}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "agents", "{{agentId}}", "knowledge", "{{filename}}"]
             }
           }
         }
