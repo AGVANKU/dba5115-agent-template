@@ -58,7 +58,17 @@ def list_agents(req: func.HttpRequest) -> func.HttpResponse:
         with get_session() as session:
             from agents.utility.util_datamodel import AgentDefinition
             rows = session.query(AgentDefinition).all()
-            data = [{"id": r.id, "name": r.name, "description": r.description, "model": r.model, "is_active": r.is_active} for r in rows]
+            data = [
+                {
+                    "id": r.id,
+                    "name": r.name,
+                    "description": r.description,
+                    "model": r.model,
+                    "knowledge_source": r.knowledge_source,
+                    "is_active": r.is_active
+                }
+                for r in rows
+            ]
         return _json_response(data)
     except Exception as e:
         logging.exception("list_agents error")
@@ -94,6 +104,9 @@ def get_agent(req: func.HttpRequest) -> func.HttpResponse:
                 "name": agent.name,
                 "description": agent.description,
                 "model": agent.model,
+                "knowledge_source": agent.knowledge_source,
+                "vector_store_id": agent.vector_store_id,
+                "last_indexed_at": agent.last_indexed_at.isoformat() if agent.last_indexed_at else None,
                 "is_active": agent.is_active,
                 "prompt": {"id": prompt_row.id, "blob_path": prompt_row.blob_path, "description": prompt_row.description} if prompt_row else None,
                 "tools": [{"id": t.id, "tool_name": t.tool_name, "blob_path": t.blob_path, "executor_name": t.executor_name} for t in tool_rows],
@@ -107,7 +120,7 @@ def get_agent(req: func.HttpRequest) -> func.HttpResponse:
 @bp.route(route="config/agents", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
 def create_agent(req: func.HttpRequest) -> func.HttpResponse:
     """Create a new agent definition.
-    Body: {"name": "...", "description": "...", "model": "gpt-4o-mini"}
+    Body: {"name": "...", "description": "...", "model": "gpt-4o-mini", "knowledge_source": "knowledge/docs"}
     """
     import os
     from agents.utility.util_database import get_session
@@ -123,6 +136,7 @@ def create_agent(req: func.HttpRequest) -> func.HttpResponse:
 
     description = body.get("description", f"Agent: {name}")
     model = body.get("model", os.getenv("DEFAULT_AGENT_MODEL", "gpt-4o-mini"))
+    knowledge_source = body.get("knowledge_source")
 
     try:
         _ensure_tables()
@@ -130,11 +144,23 @@ def create_agent(req: func.HttpRequest) -> func.HttpResponse:
             existing = session.query(AgentDefinition).filter(AgentDefinition.name == name).first()
             if existing:
                 return _error(f"Agent '{name}' already exists (id={existing.id}). Use PUT to update.", 409)
-            agent = AgentDefinition(name=name, description=description, model=model, is_active=True)
+            agent = AgentDefinition(
+                name=name,
+                description=description,
+                model=model,
+                knowledge_source=knowledge_source,
+                is_active=True
+            )
             session.add(agent)
             session.flush()
             agent_id = agent.id
-        return _json_response({"status": "created", "id": agent_id, "name": name, "model": model}, 201)
+        return _json_response({
+            "status": "created",
+            "id": agent_id,
+            "name": name,
+            "model": model,
+            "knowledge_source": knowledge_source
+        }, 201)
     except Exception as e:
         logging.exception("create_agent error")
         return _error(str(e), 500)
@@ -143,7 +169,9 @@ def create_agent(req: func.HttpRequest) -> func.HttpResponse:
 @bp.route(route="config/agents/{id}", methods=["PUT"], auth_level=func.AuthLevel.FUNCTION)
 def update_agent(req: func.HttpRequest) -> func.HttpResponse:
     """Update an existing agent definition.
-    Body: {"description": "...", "model": "gpt-4o"}
+    Body: {"description": "...", "model": "gpt-4o", "knowledge_source": "knowledge/docs"}
+
+    Note: Setting knowledge_source clears vector_store_id and file_manifest to force reindex.
     """
     from agents.utility.util_database import get_session
     try:
@@ -167,6 +195,14 @@ def update_agent(req: func.HttpRequest) -> func.HttpResponse:
                 agent.description = body["description"]
             if "model" in body:
                 agent.model = body["model"]
+            if "knowledge_source" in body:
+                new_source = body["knowledge_source"]
+                if new_source != agent.knowledge_source:
+                    # Knowledge source changed — clear cached vector store to force reindex
+                    agent.knowledge_source = new_source
+                    agent.vector_store_id = None
+                    agent.file_manifest = None
+                    agent.last_indexed_at = None
             if "is_active" in body:
                 agent.is_active = body["is_active"]
         return _json_response({"status": "updated", "id": agent_id})
@@ -177,10 +213,11 @@ def update_agent(req: func.HttpRequest) -> func.HttpResponse:
 
 @bp.route(route="config/agents/{id}", methods=["DELETE"], auth_level=func.AuthLevel.FUNCTION)
 def delete_agent(req: func.HttpRequest) -> func.HttpResponse:
-    """Delete an agent definition with cascade delete of prompts and tool mappings.
+    """Delete an agent definition with cascade delete of prompts, tool mappings, and vector store.
 
     - Prompts: Deletes DB row and blob file
     - Tool mappings: Deletes DB row, only deletes blob if no other agent uses the same tool_name
+    - Vector store: Deletes from Azure AI Foundry if agent had knowledge_source configured
     """
     from agents.utility.util_database import get_session
     from agents.utility.util_datamodel import AgentPromptRegistry, AgentToolMapping
@@ -235,6 +272,18 @@ def delete_agent(req: func.HttpRequest) -> func.HttpResponse:
                 session.delete(tool)
                 deleted_tools += 1
 
+            # Delete vector store if agent had knowledge configured
+            deleted_vector_store = False
+            if agent.vector_store_id:
+                try:
+                    from agents.tools.knowledge import delete_vector_store
+                    from agents.runtime.util_agents import get_agents_client
+                    agent_client = get_agents_client()
+                    delete_vector_store(agent_client, agent.vector_store_id)
+                    deleted_vector_store = True
+                except Exception as e:
+                    logging.warning(f"Failed to delete vector store {agent.vector_store_id}: {e}")
+
             # Delete the agent
             session.delete(agent)
 
@@ -244,7 +293,8 @@ def delete_agent(req: func.HttpRequest) -> func.HttpResponse:
             "cascade": {
                 "prompts_deleted": deleted_prompts,
                 "tool_mappings_deleted": deleted_tools,
-                "blobs_deleted": deleted_blobs
+                "blobs_deleted": deleted_blobs,
+                "vector_store_deleted": deleted_vector_store
             }
         })
     except Exception as e:
@@ -651,6 +701,167 @@ def delete_tool(req: func.HttpRequest) -> func.HttpResponse:
         return _json_response({"status": "deleted"})
     except Exception as e:
         logging.exception("delete_tool error")
+        return _error(str(e), 500)
+
+
+# =============================================================================
+# KNOWLEDGE FILES
+# =============================================================================
+
+@bp.route(route="config/agents/{id}/knowledge", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def list_knowledge_files(req: func.HttpRequest) -> func.HttpResponse:
+    """List all files in an agent's knowledge source."""
+    from agents.utility.util_database import get_session
+    from agents.utility.util_blob import list_blobs
+
+    try:
+        agent_id = int(req.route_params["id"])
+    except (ValueError, KeyError):
+        return _error("Invalid agent id")
+
+    try:
+        _ensure_tables()
+        with get_session() as session:
+            agent = _get_agent_by_id(session, agent_id)
+            if not agent:
+                return _error("Agent not found", 404)
+            if not agent.knowledge_source:
+                return _error("Agent has no knowledge_source configured", 400)
+
+            files = list_blobs(agent.knowledge_source)
+            # Return relative paths (strip knowledge_source prefix)
+            prefix = agent.knowledge_source.rstrip("/") + "/"
+            file_list = [
+                {"name": f[len(prefix):] if f.startswith(prefix) else f, "path": f}
+                for f in files
+            ]
+
+        return _json_response({
+            "agent_id": agent_id,
+            "knowledge_source": agent.knowledge_source,
+            "files": file_list
+        })
+    except Exception as e:
+        logging.exception("list_knowledge_files error")
+        return _error(str(e), 500)
+
+
+@bp.route(route="config/agents/{id}/knowledge", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def upload_knowledge_file(req: func.HttpRequest) -> func.HttpResponse:
+    """Upload a file to an agent's knowledge source.
+
+    Accepts multipart/form-data with 'file' field.
+    Clears file_manifest to trigger reindex on next agent run.
+    """
+    from agents.utility.util_database import get_session
+    from agents.utility.util_blob import ensure_container
+    from azure.storage.blob import BlobServiceClient
+    import os
+
+    try:
+        agent_id = int(req.route_params["id"])
+    except (ValueError, KeyError):
+        return _error("Invalid agent id")
+
+    content_type = (req.headers.get("Content-Type") or "").lower()
+    if "multipart/form-data" not in content_type:
+        return _error("Content-Type must be multipart/form-data")
+
+    uploaded = req.files.get("file")
+    if not uploaded:
+        return _error("No 'file' field in multipart upload")
+
+    filename = uploaded.filename
+    if not filename:
+        return _error("Uploaded file has no filename")
+
+    try:
+        _ensure_tables()
+        with get_session() as session:
+            agent = _get_agent_by_id(session, agent_id)
+            if not agent:
+                return _error("Agent not found", 404)
+            if not agent.knowledge_source:
+                return _error("Agent has no knowledge_source configured. Set knowledge_source first via PUT.", 400)
+
+            # Upload to blob
+            ensure_container()
+            blob_path = f"{agent.knowledge_source.rstrip('/')}/{filename}"
+
+            conn_str = os.getenv("AGENT_CONFIG_BLOB_CONN_STR", "")
+            container_name = os.getenv("AGENT_CONFIG_CONTAINER", "agent-config")
+            blob_service = BlobServiceClient.from_connection_string(conn_str)
+            blob_client = blob_service.get_blob_client(container=container_name, blob=blob_path)
+            blob_client.upload_blob(uploaded.stream.read(), overwrite=True)
+
+            # Clear manifest to force reindex
+            agent.file_manifest = None
+            agent.vector_store_id = None
+            session.commit()
+
+            logging.info(f"Uploaded knowledge file: {blob_path}")
+
+        return _json_response({
+            "status": "uploaded",
+            "agent_id": agent_id,
+            "filename": filename,
+            "blob_path": blob_path,
+            "note": "Knowledge base will reindex on next agent run"
+        }, 201)
+    except Exception as e:
+        logging.exception("upload_knowledge_file error")
+        return _error(str(e), 500)
+
+
+@bp.route(route="config/agents/{id}/knowledge/{filename}", methods=["DELETE"], auth_level=func.AuthLevel.FUNCTION)
+def delete_knowledge_file(req: func.HttpRequest) -> func.HttpResponse:
+    """Delete a file from an agent's knowledge source.
+
+    Clears file_manifest to trigger reindex on next agent run.
+    """
+    from agents.utility.util_database import get_session
+    from agents.utility.util_blob import delete_blob
+
+    try:
+        agent_id = int(req.route_params["id"])
+        filename = req.route_params.get("filename")
+    except (ValueError, KeyError):
+        return _error("Invalid agent id")
+
+    if not filename:
+        return _error("Filename is required")
+
+    try:
+        _ensure_tables()
+        with get_session() as session:
+            agent = _get_agent_by_id(session, agent_id)
+            if not agent:
+                return _error("Agent not found", 404)
+            if not agent.knowledge_source:
+                return _error("Agent has no knowledge_source configured", 400)
+
+            blob_path = f"{agent.knowledge_source.rstrip('/')}/{filename}"
+
+            try:
+                delete_blob(blob_path)
+            except Exception:
+                return _error(f"File '{filename}' not found in knowledge source", 404)
+
+            # Clear manifest to force reindex
+            agent.file_manifest = None
+            agent.vector_store_id = None
+            session.commit()
+
+            logging.info(f"Deleted knowledge file: {blob_path}")
+
+        return _json_response({
+            "status": "deleted",
+            "agent_id": agent_id,
+            "filename": filename,
+            "note": "Knowledge base will reindex on next agent run"
+        })
+    except Exception as e:
+        logging.exception("delete_knowledge_file error")
         return _error(str(e), 500)
 
 

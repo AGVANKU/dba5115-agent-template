@@ -52,11 +52,9 @@ def _retry_with_backoff(func, *args, **kwargs):
             # Check if it's a timeout or rate limit error
             if "timeout" in error_str or "rate_limit" in error_str or "429" in error_str or "timed out" in error_str:
                 wait_time = INITIAL_BACKOFF * (2 ** attempt)
-                logging.warning(f"=== RETRY === Attempt {attempt + 1}/{MAX_RETRIES} failed: {type(e).__name__}. Waiting {wait_time}s...")
                 time.sleep(wait_time)
             else:
                 raise  # Re-raise if it's not a retryable error
-    logging.error(f"=== RETRY EXHAUSTED === All {MAX_RETRIES} attempts failed")
     raise last_error
 
 
@@ -283,15 +281,6 @@ def get_agent_response(
     final_prompt = final_usage.prompt_tokens if final_usage else 0
     final_completion = final_usage.completion_tokens if final_usage else 0
     
-    logging.info(
-        "=== FINAL TOKEN SUMMARY === prompt=%d completion=%d total=%d | inference_rounds=%d tool_rounds=%d | thread_messages=%d",
-        final_prompt,
-        final_completion,
-        final_prompt + final_completion,
-        inference_rounds,
-        tool_call_rounds,
-        thread_message_count,
-    )
     
     return AgentResponse(
         status=responses[-1].get("status", "completed") if responses else "completed",
@@ -357,7 +346,7 @@ def get_agent(agent_type: str) -> ManagedAgent:
             tools=tools.definitions,
             tool_resources=tools.tool_resources,
             temperature=0)  # Deterministic output
-        logging.info("=== AGENT CREATED === New agent '%s' (id=%s, model=%s)", agent_type, agent.id, agent_model)
+        logging.info("Agent created: %s (model=%s)", agent_type, agent_model)
     else:
         agent = _retry_with_backoff(
             agent_client.update_agent,
@@ -367,7 +356,7 @@ def get_agent(agent_type: str) -> ManagedAgent:
             tools=tools.definitions,
             tool_resources=tools.tool_resources,
             temperature=0)  # Deterministic output
-        logging.info("=== AGENT UPDATED === Updated agent '%s' (id=%s, model=%s)", agent_type, agent.id, agent_model)
+        logging.info("Agent updated: %s (model=%s)", agent_type, agent_model)
 
     return ManagedAgent(agent_client=agent_client, agent=agent, tool_executors=tools.executors)
 
@@ -380,7 +369,7 @@ def get_tools(agent_type: str) -> LoadedTools:
         agent_type: The agent type (e.g., 'deployment', 'troubleshooting')
 
     Returns:
-        LoadedTools with definitions and executors
+        LoadedTools with definitions, executors, and tool_resources (for knowledge agents)
 
     Example:
         tools = get_tools('deployment')
@@ -388,9 +377,19 @@ def get_tools(agent_type: str) -> LoadedTools:
     definitions = get_tool_definitions(agent_type)
     executors = get_tool_executors(agent_type)
 
-    if definitions and executors:
-        logging.info(f"=== TOOLS === Loaded {len(definitions)} tools for '{agent_type}' using CONSOLIDATED approach")
-        return LoadedTools(definitions=definitions, executors=executors)
+    # Check for knowledge base configuration (RAG capability)
+    tool_resources = None
+    try:
+        from agents.tools.knowledge import get_knowledge_resources, get_file_search_tool
+        tool_resources = get_knowledge_resources(agent_type)
+        if tool_resources:
+            # Add file_search tool to definitions for knowledge agents
+            definitions = definitions + [get_file_search_tool()]
+    except Exception as e:
+        logging.warning(f"Knowledge resource lookup failed for '{agent_type}': {e}")
+
+    if definitions or executors or tool_resources:
+        return LoadedTools(definitions=definitions, executors=executors, tool_resources=tool_resources)
     else:
-        logging.warning(f"=== TOOLS === No tools found in consolidated mapping for '{agent_type}'")
+        logging.warning(f"No tools found for agent '{agent_type}'")
         return LoadedTools(definitions=[], executors={})

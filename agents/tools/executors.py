@@ -25,7 +25,7 @@ def determine_recipient(agent_type, status=None, student_email=None, confidence=
     try:
         return _determine(agent_type=agent_type, payload=payload, context=context)
     except Exception as e:
-        logging.error(f"[TOOL] determine_recipient error: {e}")
+        logging.error(f"determine_recipient error: {e}")
         return {"skip": False, "recipient": os.getenv("NUS_EMAIL", ""), "recipient_type": "admin", "error": str(e)}
 
 
@@ -41,9 +41,8 @@ def send_email_notification(recipient, recipient_type, agent_type, subject,
 
     # Render HTML from sections
     template_dir = Path(__file__).resolve().parent.parent / "templates"
-    logging.info(f"[TOOL] send_email_notification: template_dir={template_dir}, exists={template_dir.exists()}")
     section_templates = {}
-    for st in ["executive_summary", "status_box", "resource_list", "next_steps", "alert", "code_block"]:
+    for st in ["executive_summary", "status_box", "resource_list", "next_steps", "alert", "code_block", "bullet_list"]:
         tp = template_dir / "sections" / f"{st}.html"
         if tp.exists():
             with open(tp, 'r', encoding='utf-8') as f:
@@ -57,7 +56,7 @@ def send_email_notification(recipient, recipient_type, agent_type, subject,
         try:
             body_html += section_templates[st].render(**section) + "\n"
         except Exception as e:
-            logging.error(f"[TOOL] Failed to render section {st}: {e}")
+            logging.error(f"Failed to render section {st}: {e}")
 
     full_html = body_html or "<p>No content available</p>"
     main_template_path = template_dir / "email_notification.html"
@@ -71,9 +70,7 @@ def send_email_notification(recipient, recipient_type, agent_type, subject,
                 current_year=datetime.now().year
             )
         except Exception as e:
-            logging.error(f"[TOOL] Failed to render main template: {e}")
-
-    logging.info(f"[TOOL] send_email_notification: html_length={len(full_html)}")
+            logging.error(f"Failed to render email template: {e}")
 
     # Send email
     try:
@@ -97,7 +94,7 @@ def send_email_notification(recipient, recipient_type, agent_type, subject,
 
         return {"status": "success", "recipient": recipient, "cc": cc, "subject": subject}
     except Exception as e:
-        logging.error(f"[TOOL] Failed to send to {recipient}: {e}")
+        logging.error(f"Failed to send email to {recipient}: {e}")
         return {"status": "error", "recipient": recipient, "reason": str(e)}
 
 

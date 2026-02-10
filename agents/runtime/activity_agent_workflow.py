@@ -61,13 +61,7 @@ def run_agent_workflow(workflowInput: dict) -> dict:
     
     agent_type = input_data.agent_type
     logging.info(f"Running agent workflow: {agent_type}")
-    
-    # DEBUG: Log input for debugging
-    if agent_type in ["student_sp_config", "notification_content", "student_list_init", "deployment"]:
-        logging.info(f"=== DEBUG {agent_type} INPUT ===")
-        logging.info(f"Payload keys: {input_data.payload.keys() if isinstance(input_data.payload, dict) else 'not a dict'}")
-        logging.info(f"Payload: {json.dumps(input_data.payload, indent=2, default=str)[:1000]}")
-    
+
     try:
         # Load agent
         agent = get_agent(agent_type)
@@ -104,18 +98,7 @@ def run_agent_workflow(workflowInput: dict) -> dict:
                 reason=f"No response from agent: {agent_type}",
                 agent_type=agent_type
             ))
-        
-        # DEBUG: Log raw agent response for notification_content
-        if agent_type == "notification_content":
-            logging.info(f"=== DEBUG NOTIFICATION_CONTENT RESPONSE ===")
-            logging.info(f"Status: {agent_response.status}")
-            logging.info(f"Response count: {len(agent_response.responses)}")
-            if agent_response.responses:
-                raw_response = agent_response.responses[0]
-                logging.info(f"Raw response type: {type(raw_response)}")
-                logging.info(f"Raw response (first 500 chars): {str(raw_response)[:500]}")
-                logging.info(f"Raw response (full): {str(raw_response)}")
-        
+
         # Extract metadata from agent response for analytics
         first_resp = agent_response.responses[0] if agent_response.responses else {}
         if isinstance(first_resp, dict):
@@ -193,16 +176,7 @@ def _determine_next_action(
     
     # Extract next_action from agent's response
     agent_next_action = first_response.get("next_action") if isinstance(first_response, dict) else None
-    
-    # DEBUG: Log next_action extraction for deployment agent
-    if agent_type == "deployment":
-        logging.info(f"=== DEPLOYMENT AGENT NEXT_ACTION ===")
-        logging.info(f"next_action extracted: {agent_next_action}")
-        logging.info(f"Full response keys: {first_response.keys() if isinstance(first_response, dict) else 'not dict'}")
-        if isinstance(first_response, dict):
-            logging.info(f"Response status: {first_response.get('status')}")
-            logging.info(f"Response message: {first_response.get('message')}")
-    
+
     if not agent_next_action:
         # Agent chose not to route anywhere (terminal state or orchestrator handles it)
         # For deployment agent: this is expected when provisioning is in progress (orchestrator will queue back)
