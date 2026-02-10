@@ -36,6 +36,13 @@ def get_blob_text(path: str) -> str:
     return blob.download_blob(encoding="utf-8").readall()
 
 
+def get_blob_bytes(path: str) -> bytes:
+    """Download a blob as raw bytes (for binary files like PDFs)."""
+    container = _get_container_client()
+    blob = container.get_blob_client(path)
+    return blob.download_blob().readall()
+
+
 def upload_blob(path: str, content: str) -> None:
     """Upload text content to a blob (overwrite if exists)."""
     container = _get_container_client()

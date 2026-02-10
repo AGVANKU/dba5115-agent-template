@@ -73,15 +73,36 @@ class AgentDefinition(BaseModel):
         Name NVARCHAR(100) NOT NULL UNIQUE,
         Description NVARCHAR(500) NULL,
         Model NVARCHAR(100) NOT NULL,
+        KnowledgeSource NVARCHAR(500) NULL,
+        VectorStoreId NVARCHAR(100) NULL,
+        FileManifest NVARCHAR(MAX) NULL,
+        LastIndexedAt DATETIME NULL,
         IsActive BIT NOT NULL DEFAULT 1,
         CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
         UpdatedAt DATETIME
-    )
+    );
+
+    -- Migration: add knowledge columns if missing
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='AgentDefinition' AND COLUMN_NAME='KnowledgeSource')
+    ALTER TABLE AgentDefinition ADD KnowledgeSource NVARCHAR(500) NULL;
+
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='AgentDefinition' AND COLUMN_NAME='VectorStoreId')
+    ALTER TABLE AgentDefinition ADD VectorStoreId NVARCHAR(100) NULL;
+
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='AgentDefinition' AND COLUMN_NAME='FileManifest')
+    ALTER TABLE AgentDefinition ADD FileManifest NVARCHAR(MAX) NULL;
+
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='AgentDefinition' AND COLUMN_NAME='LastIndexedAt')
+    ALTER TABLE AgentDefinition ADD LastIndexedAt DATETIME NULL;
     """
 
     name: Mapped[str] = mapped_column("Name", String(100), nullable=False, unique=True)
     description: Mapped[str | None] = mapped_column("Description", String(500), nullable=True)
     model: Mapped[str] = mapped_column("Model", String(100), nullable=False)
+    knowledge_source: Mapped[str | None] = mapped_column("KnowledgeSource", String(500), nullable=True)
+    vector_store_id: Mapped[str | None] = mapped_column("VectorStoreId", String(100), nullable=True)
+    file_manifest: Mapped[str | None] = mapped_column("FileManifest", String, nullable=True)
+    last_indexed_at: Mapped[datetime | None] = mapped_column("LastIndexedAt", DateTime, nullable=True)
     is_active: Mapped[bool] = mapped_column("IsActive", Integer, nullable=False, default=1)
 
     def __repr__(self) -> str:
