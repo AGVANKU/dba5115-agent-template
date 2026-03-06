@@ -112,20 +112,28 @@ Before creating credentials, you must configure the OAuth consent screen. This d
 
 2. Click **Create Credentials** → **OAuth client ID**
 
-3. Select **Application type:** `Desktop app`
+3. Select **Application type:** `Web application`
 
-4. Enter **Name:** `DBA5115 Desktop Client`
+   > **Important:** You must select **Web application** (not "Desktop app"). We need this type because we will use Google's OAuth Playground to generate a refresh token, and the Playground requires a web application client with its redirect URI whitelisted. Selecting "Desktop app" will cause a `redirect_uri_mismatch` error in the next step.
 
-5. Click **Create**
+4. Enter **Name:** `DBA5115 Web Client`
 
-6. A dialog appears with your credentials:
+5. Under **Authorized redirect URIs**, click **Add URI** and enter:
+   ```
+   https://developers.google.com/oauthplayground
+   ```
+   This allows the OAuth Playground to receive the authorization response.
+
+6. Click **Create**
+
+7. A dialog appears with your credentials:
    - **Client ID:** `xxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com`
    - **Client Secret:** `GOCSPX-xxxxxxxxxxxxxxxxxxxxxxxx`
 
-7. Click **Download JSON** to save the credentials file
+8. Click **Download JSON** to save the credentials file
    - Keep this file safe — you'll need it in the next step
 
-8. Click **OK** to close the dialog
+9. Click **OK** to close the dialog
 
 ---
 
@@ -248,6 +256,17 @@ Your refresh token may have been invalidated. This can happen if:
 - The OAuth consent screen is still in "Testing" mode and 7 days passed
 
 **Solution:** Repeat Step 5 to generate a new refresh token.
+
+### "Error 400: redirect_uri_mismatch"
+
+The OAuth client type is set to "Desktop app" instead of "Web application", or the redirect URI is missing.
+
+**Solution:**
+1. Go to **APIs & Services** → **Credentials**
+2. Delete the existing OAuth client (or edit it)
+3. Create a new OAuth client with type **Web application**
+4. Add `https://developers.google.com/oauthplayground` under **Authorized redirect URIs**
+5. Use the new Client ID and Client Secret in the OAuth Playground
 
 ### "Access blocked: This app's request is invalid"
 
