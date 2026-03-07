@@ -94,3 +94,33 @@ def gmail_pull_handler(req: func.HttpRequest) -> func.HttpResponse:
         "queued": result.get("status") == "success"
     }, 200)
 
+
+# =============================================================================
+# HAIKU TIMER TRIGGER (uncomment to enable)
+# =============================================================================
+
+# @bp.timer_trigger(schedule="0 */1 * * * *", arg_name="timer", run_on_startup=False)
+# def haiku_timer_pull(timer: func.TimerRequest) -> None:
+#     """
+#     Timer trigger for periodic haiku generation.
+#     Runs every 1 minute.
+#     """
+#     logging.info("Haiku timer trigger fired")
+#
+#     if timer.past_due:
+#         logging.warning("Timer is past due - running anyway")
+#
+#     # Create trigger message with interval info
+#     message = {
+#         "source": "haiku_timer_trigger",
+#         "agent_type": "haiku_compose",
+#         "triggered_at": datetime.utcnow().isoformat(),
+#         "interval_minutes": 1  # Must match timer schedule
+#     }
+#
+#     # Publish to Service Bus
+#     queue_name = "agent-workflow"
+#     result = publish_to_service_bus(queue_name, message, ensure_queue=False)
+#
+#     logging.info(f"Timer trigger queued: {result.get('status')}")
+
