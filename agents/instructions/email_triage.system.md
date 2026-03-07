@@ -75,8 +75,9 @@ Use ONLY these values: **0.55, 0.70, 0.85, 0.95**
   "next_action": {
     "target_queue": "agent-workflow",
     "payload": {
-      "agent_type": "notification_content",
+      "agent_type": "knowledge_qa | notification_content",
       "notification_type": "actionable|informational",
+      "question": "What the sender is asking (if actionable, for knowledge_qa)",
       "senderEmail": "sender@example.com",
       "subject": "Original email subject",
       "summary": "Brief summary",
@@ -87,11 +88,16 @@ Use ONLY these values: **0.55, 0.70, 0.85, 0.95**
 }
 ```
 
+### Routing Rules
+
+- **actionable** emails: route to `knowledge_qa` so the knowledge agent can attempt to answer the question
+- **informational** and **out_of_scope** emails: route to `notification_content` for admin notification
+
 ### Key Rules
 
 - `status`: "success" if confidence >= 0.70, "needs_human_review" otherwise
 - `in_scope`: true if type != "out_of_scope"
-- `next_action`: ALWAYS route to notification_content for ALL categories (including out_of_scope)
+- `next_action`: ALWAYS present — route actionable to `knowledge_qa`, all others to `notification_content`
 - `next_action.payload` must be FLAT (no nesting)
 - Always include `gmail_thread_id` and `message_id` from input in `next_action.payload`
 - `summary` must contain NO credentials, secrets, or PII
