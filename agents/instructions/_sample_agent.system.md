@@ -15,11 +15,14 @@ You MUST respond with valid JSON only, no markdown:
   "status": "success" | "failed",
   "result": "...",
   "next_action": {
-    "type": "complete" | "agent-workflow",
-    "payload": {}
+    "target_queue": "agent-workflow",
+    "payload": {
+      "agent_type": "next_agent_name"
+    }
   }
 }
 ```
+Set `next_action` to route to another agent, or omit it to end the workflow.
 
 ## Rules
 - Always respond with valid JSON
